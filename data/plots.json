@@ -1,0 +1,117 @@
+[
+  {
+    "key": "sivaganga-1",
+    "name": "Sivaganga-1",
+    "status": "available",
+    "size": "600 sq ft",
+    "state": "Tamil Nadu",
+    "district": "Sivaganga",
+    "city": "Karaikudi",
+    "region": "Karaikudi, Sivaganga",
+    "crop": "Mullai",
+    "cropCycle": "Seasonal · year-round beds",
+    "soil": "Red loam · organic certified",
+    "totalUnits": 70,
+    "availableUnits": 59,
+    "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/72991.jpg",
+    "map": { "lat": 10.0735, "lng": 78.7732 },
+    "gallery": [
+      { "label": "week 32", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/72991.jpg" },
+      { "label": "week 31", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/9355.jpg" },
+      { "label": "beds", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/14786.jpg" },
+      { "label": "drip", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/2148579733.jpg" }
+    ]
+  },
+  {
+    "key": "sivaganga-2",
+    "name": "Sivaganga-2",
+    "status": "booked",
+    "size": "600 sq ft",
+    "state": "Tamil Nadu",
+    "district": "Sivaganga",
+    "city": "Devakottai",
+    "region": "Devakottai, Sivaganga",
+    "crop": "Mullai",
+    "cropCycle": "Seasonal · year-round beds",
+    "soil": "Red loam · organic certified",
+    "totalUnits": 60,
+    "availableUnits": 0,
+    "imageUrl": "https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?w=600&q=80",
+    "map": { "lat": 9.9477, "lng": 78.7732 },
+    "gallery": [
+      { "label": "week 32", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/72991.jpg" },
+      { "label": "week 31", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/9355.jpg" },
+      { "label": "beds", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/14786.jpg" },
+      { "label": "drip", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/2148579733.jpg" }
+    ]
+  },
+  {
+    "key": "theni-1",
+    "name": "Periyakulam-1",
+    "status": "available",
+    "size": "600 sq ft",
+    "state": "Tamil Nadu",
+    "district": "Theni",
+    "city": "Periyakulam",
+    "region": "Periyakulam, Theni",
+    "crop": "Mullai",
+    "cropCycle": "Seasonal · year-round beds",
+    "soil": "Red loam · organic certified",
+    "totalUnits": 80,
+    "availableUnits": 44,
+    "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/9355.jpg",
+    "map": { "lat": 10.1221, "lng": 77.545 },
+    "gallery": [
+      { "label": "week 32", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/72991.jpg" },
+      { "label": "week 31", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/9355.jpg" },
+      { "label": "beds", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/14786.jpg" },
+      { "label": "drip", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/2148579733.jpg" }
+    ]
+  },
+  {
+    "key": "pudukkottai-1",
+    "name": "Pudukkottai-1",
+    "status": "soon",
+    "size": "600 sq ft",
+    "state": "Tamil Nadu",
+    "district": "Pudukkottai",
+    "city": "Aranthangi",
+    "region": "Aranthangi, Pudukkottai",
+    "crop": "Mullai",
+    "cropCycle": "Seasonal · year-round beds",
+    "soil": "Red loam · organic certified",
+    "totalUnits": 50,
+    "availableUnits": 0,
+    "imageUrl": "https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80",
+    "map": { "lat": 10.168, "lng": 79.0 },
+    "gallery": [
+      { "label": "week 32", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/72991.jpg" },
+      { "label": "week 31", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/9355.jpg" },
+      { "label": "beds", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/14786.jpg" },
+      { "label": "drip", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/2148579733.jpg" }
+    ]
+  },
+  {
+    "key": "pudukkottai-2",
+    "name": "Pudukkottai-2",
+    "status": "soon",
+    "size": "600 sq ft",
+    "state": "Tamil Nadu",
+    "district": "Pudukkottai",
+    "city": "Gandarvakottai",
+    "region": "Gandarvakottai, Pudukkottai",
+    "crop": "Mullai",
+    "cropCycle": "Seasonal · year-round beds",
+    "soil": "Red loam · organic certified",
+    "totalUnits": 50,
+    "availableUnits": 0,
+    "imageUrl": "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=80",
+    "map": { "lat": 10.35, "lng": 78.95 },
+    "gallery": [
+      { "label": "week 32", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/72991.jpg" },
+      { "label": "week 31", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/9355.jpg" },
+      { "label": "beds", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/14786.jpg" },
+      { "label": "drip", "imageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/2148579733.jpg" }
+    ]
+  }
+]

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CHEDI Admin — Payment Requests</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@500;600&family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1c3b2c;
+      --muted: #6f7566;
+      --bg: #eef2e9;
+      --card: #f6f3ea;
+      --line: #dbe0d1;
+      --gold: #b98a2e;
+      --danger: #b0361f;
+      --ok: #2e5a41;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: linear-gradient(160deg, #e8efe3 0%, #f6f3ea 45%, #eef2e9 100%);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 28px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(246, 243, 234, 0.9);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .brand { font-family: 'Newsreader', serif; font-size: 26px; letter-spacing: .12em; font-weight: 600; }
+    .eyebrow { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .14em; color: var(--gold); text-transform: uppercase; }
+    main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+    .card {
+      background: #fff;
+      border: 1px solid #e4ded0;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    h1 { font-family: 'Newsreader', serif; font-weight: 500; font-size: 32px; margin: 0 0 8px; }
+    p.lead { color: var(--muted); margin: 0 0 22px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #d8cfb8;
+      border-radius: 4px;
+      background: #faf8f2;
+      font: inherit;
+      color: var(--ink);
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border-radius: 3px;
+      border: 1px solid transparent;
+      padding: 11px 18px;
+      font-weight: 600;
+    }
+    .btn-primary { background: var(--ink); color: #f6f3ea; }
+    .btn-outline { background: #fff; border-color: #d8cfb8; color: var(--ink); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-ok { background: var(--ok); color: #fff; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .hidden { display: none !important; }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #eef2e9;
+    }
+    .badge.pending { color: #8a5a12; background: #f7ecd4; border-color: #e6d3a4; }
+    .badge.succeeded { color: var(--ok); background: #e4efe8; border-color: #c5d9cb; }
+    .badge.cancelled { color: var(--danger); background: #f8e8e4; border-color: #e7c4bb; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid #efe9db; vertical-align: top; }
+    th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+    .err { color: var(--danger); font-size: 13px; margin-top: 10px; }
+    .okmsg { color: var(--ok); font-size: 13px; margin-top: 10px; }
+    .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    #loginView { max-width: 420px; margin: 64px auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="brand">CHEDI</div>
+      <div class="eyebrow">Admin · Payment Requests</div>
+    </div>
+    <div class="row">
+      <button id="logoutBtn" class="btn-outline hidden" type="button">Log out</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="loginView" class="card">
+      <h1>Admin sign-in</h1>
+      <p class="lead">Approve membership, lease, and renewal payment requests after collecting payment offline.</p>
+      <label for="password">Admin key</label>
+      <input id="password" type="password" placeholder="Admin API key" autocomplete="current-password" />
+      <div class="row" style="margin-top:16px">
+        <button id="loginBtn" class="btn-primary" type="button">Enter dashboard</button>
+      </div>
+      <div id="loginError" class="err"></div>
+      <p class="meta" style="margin-top:16px">Demo key: <code>chedi-admin-demo</code></p>
+    </section>
+
+    <section id="dashView" class="hidden">
+      <div class="row" style="justify-content:space-between;margin-bottom:18px">
+        <div>
+          <h1>Payment requests</h1>
+          <p class="lead">Contact the member by email, collect payment manually, then mark as Paid.</p>
+        </div>
+        <div class="row">
+          <select id="statusFilter" style="width:auto;min-width:160px">
+            <option value="pending">Pending</option>
+            <option value="succeeded">Paid</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="all">All</option>
+          </select>
+          <button id="refreshBtn" class="btn-outline" type="button">Refresh</button>
+        </div>
+      </div>
+      <div id="dashMsg" class="okmsg"></div>
+      <div id="dashError" class="err"></div>
+      <div class="card" style="padding:0;overflow:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Request</th>
+              <th>Member</th>
+              <th>Context</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="paymentsBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API = '/api/admin';
+    const state = { token: localStorage.getItem('chedi_admin_token') || '' };
+
+    const $ = (id) => document.getElementById(id);
+
+    function showLogin() {
+      $('loginView').classList.remove('hidden');
+      $('dashView').classList.add('hidden');
+      $('logoutBtn').classList.add('hidden');
+    }
+
+    function showDash() {
+      $('loginView').classList.add('hidden');
+      $('dashView').classList.remove('hidden');
+      $('logoutBtn').classList.remove('hidden');
+      loadPayments();
+    }
+
+    async function api(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      if (state.token) headers.Authorization = 'Bearer ' + state.token;
+      const res = await fetch(API + path, { ...opts, headers });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.error?.message || data?.message || ('HTTP ' + res.status);
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    async function login() {
+      $('loginError').textContent = '';
+      try {
+        const data = await api('/login', {
+          method: 'POST',
+          body: JSON.stringify({ password: $('password').value }),
+        });
+        state.token = data.token;
+        localStorage.setItem('chedi_admin_token', state.token);
+        showDash();
+      } catch (err) {
+        $('loginError').textContent = err.message;
+      }
+    }
+
+    function logout() {
+      state.token = '';
+      localStorage.removeItem('chedi_admin_token');
+      showLogin();
+    }
+
+    function badge(status) {
+      return '<span class="badge ' + status + '">' + status + '</span>';
+    }
+
+    async function loadPayments() {
+      $('dashError').textContent = '';
+      $('dashMsg').textContent = '';
+      try {
+        const status = $('statusFilter').value;
+        const data = await api('/payments?status=' + encodeURIComponent(status));
+        const body = $('paymentsBody');
+        if (!data.items?.length) {
+          body.innerHTML = '<tr><td colspan="6" style="padding:28px;color:#6f7566">No payment requests in this filter.</td></tr>';
+          return;
+        }
+        body.innerHTML = data.items.map((p) => {
+          const canAct = p.status === 'pending';
+          return (
+            '<tr>' +
+            '<td><strong>' + (p.ref || p.id) + '</strong><div class="meta">' + (p.label || '') + '<br/>' + (p.date || '') + '</div></td>' +
+            '<td><strong>' + (p.memberName || '—') + '</strong><div class="meta">' + (p.memberEmail || '') + '<br/>' + (p.memberPhone || '') + '</div></td>' +
+            '<td>' + (p.context || '') + '</td>' +
+            '<td>' + (p.amountFormatted || '') + '</td>' +
+            '<td>' + badge(p.status) + '</td>' +
+            '<td class="actions">' +
+              (canAct
+                ? '<button class="btn-ok" data-approve="' + p.id + '" type="button">Mark Paid</button>' +
+                  '<button class="btn-danger" data-reject="' + p.id + '" type="button">Reject</button>'
+                : '—') +
+            '</td>' +
+            '</tr>'
+          );
+        }).join('');
+
+        body.querySelectorAll('[data-approve]').forEach((btn) => {
+          btn.addEventListener('click', () => approve(btn.getAttribute('data-approve')));
+        });
+        body.querySelectorAll('[data-reject]').forEach((btn) => {
+          btn.addEventListener('click', () => reject(btn.getAttribute('data-reject')));
+        });
+      } catch (err) {
+        $('dashError').textContent = err.message;
+        if (/unauthorized|admin/i.test(err.message)) logout();
+      }
+    }
+
+    async function approve(id) {
+      $('dashError').textContent = '';
+      try {
+        const note = prompt('Optional note (e.g. UTR / collection details)', '') || '';
+        const data = await api('/payments/' + encodeURIComponent(id) + '/approve', {
+          method: 'POST',
+          body: JSON.stringify({ adminNote: note, approvedBy: 'admin' }),
+        });
+        $('dashMsg').textContent = data.notice || 'Marked as Paid.';
+        await loadPayments();
+      } catch (err) {
+        $('dashError').textContent = err.message;
+      }
+    }
+
+    async function reject(id) {
+      if (!confirm('Reject this payment request?')) return;
+      $('dashError').textContent = '';
+      try {
+        await api('/payments/' + encodeURIComponent(id) + '/reject', {
+          method: 'POST',
+          body: JSON.stringify({ adminNote: 'Rejected from admin dashboard' }),
+        });
+        $('dashMsg').textContent = 'Request rejected.';
+        await loadPayments();
+      } catch (err) {
+        $('dashError').textContent = err.message;
+      }
+    }
+
+    $('loginBtn').addEventListener('click', login);
+    $('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+    $('logoutBtn').addEventListener('click', logout);
+    $('refreshBtn').addEventListener('click', loadPayments);
+    $('statusFilter').addEventListener('change', loadPayments);
+
+    if (state.token) showDash();
+    else showLogin();
+  </script>
+</body>
+</html>

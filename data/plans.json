@@ -1,0 +1,59 @@
+[
+  {
+    "key": "family4",
+    "tag": "STARTER",
+    "name": "Family of 4",
+    "priceInr": 120000,
+    "priceFormatted": "₹1,20,000",
+    "totalInr": 130000,
+    "totalFormatted": "₹1,30,000",
+    "plotsLabel": "1 plot",
+    "sizeLabel": "600 sq ft",
+    "featured": false,
+    "features": [
+      "1 dedicated 600 sq ft plot",
+      "1 box delivered weekly",
+      "6–8 varieties weekly",
+      "Weekly doorstep delivery",
+      "Live plot dashboard"
+    ]
+  },
+  {
+    "key": "family8",
+    "tag": "POPULAR",
+    "name": "Family of 8",
+    "priceInr": 240000,
+    "priceFormatted": "₹2,40,000",
+    "totalInr": 250000,
+    "totalFormatted": "₹2,50,000",
+    "plotsLabel": "2 plots",
+    "sizeLabel": "1,200 sq ft",
+    "featured": true,
+    "features": [
+      "2 dedicated 600 sq ft plots",
+      "2 boxes delivered weekly",
+      "6–8 varieties weekly",
+      "Weekly doorstep delivery",
+      "Live plot dashboard"
+    ]
+  },
+  {
+    "key": "family12",
+    "tag": "COMMUNITY",
+    "name": "Family of 12",
+    "priceInr": 380000,
+    "priceFormatted": "₹3,80,000",
+    "totalInr": 390000,
+    "totalFormatted": "₹3,90,000",
+    "plotsLabel": "3 plots",
+    "sizeLabel": "1,800 sq ft",
+    "featured": false,
+    "features": [
+      "3 dedicated 600 sq ft plots",
+      "3 boxes delivered weekly",
+      "6–8 varieties weekly",
+      "Weekly doorstep delivery",
+      "Live plot dashboard"
+    ]
+  }
+]

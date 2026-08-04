@@ -1,0 +1,25 @@
+{
+  "terms": {
+    "doc": "terms",
+    "title": "Terms & Conditions",
+    "paragraphs": [
+      "Membership: A one-time ₹500 fee activates your Farm Club membership and is non-transferable.",
+      "Plot leases: Annual subscriptions attach to the plot you select. Multi-plot allocation within a single plan is subject to product rules.",
+      "Deliveries: Weekly boxes are delivered to addresses within city limits. Cancel only for weeks outside the two-week harvest lock window.",
+      "Billing: Renewals are billed manually at cycle end. CHEDI does not auto-charge your card.",
+      "Conduct: Misuse of membership, payment fraud, or abuse of delivery schedules may result in suspension."
+    ],
+    "updatedAt": "2026-07-01"
+  },
+  "privacy": {
+    "doc": "privacy",
+    "title": "Privacy Policy",
+    "paragraphs": [
+      "We collect your name, phone, email, and delivery address to operate Farm Club membership and deliveries.",
+      "Payment card numbers and CVVs are never stored on CHEDI servers; they are tokenized via our payment partner.",
+      "You may request a copy of your data or delete your account from Settings. Financial records may be retained as required by law.",
+      "We use notifications (push, SMS, or email) based on your preferences to share delivery and harvest updates."
+    ],
+    "updatedAt": "2026-07-01"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "faq": [
+    {
+      "id": "faq_1",
+      "label": "How does the ₹500 membership work?",
+      "body": "A one-time ₹500 activates your Farm Club membership and includes a complimentary welcome basket of seasonal vegetables. Membership is required before you can lease a plot."
+    },
+    {
+      "id": "faq_2",
+      "label": "What is included in a plot subscription?",
+      "body": "Your annual plan covers dedicated plot farming, weekly produce boxes, and live plot tracking. A flat ₹10,000 delivery charge covers doorstep delivery across Tamil Nadu."
+    },
+    {
+      "id": "faq_3",
+      "label": "Can I cancel a weekly delivery?",
+      "body": "Yes — deliveries two or more weeks out can be cancelled. The next two delivery slots are locked because produce is already being harvested."
+    },
+    {
+      "id": "faq_4",
+      "label": "How does renewal billing work?",
+      "body": "Billing is manual. At the end of your plan year we generate a renewal bill. You pay it to continue weekly deliveries — there is no auto-charge."
+    }
+  ],
+  "contacts": [
+    { "type": "email", "label": "Email support", "value": "support@chedi.in" },
+    { "type": "phone", "label": "Call us", "value": "+91 94441 26240" },
+    { "type": "legal", "label": "Terms & Conditions", "doc": "terms" },
+    { "type": "legal", "label": "Privacy Policy", "doc": "privacy" }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "chediwebapp-backend",
+  "version": "1.0.0",
+  "description": "CHEDI CSA Member App API — Node.js / Express backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "dev:memory": "node scripts/dev-memory.js",
+    "seed": "node seed/seed.js",
+    "seed:dummy": "node scripts/seed-dummy-five.js",
+    "e2e:api": "node scripts/e2e-api.js",
+    "ensure-indexes": "node scripts/ensure-indexes.js",
+    "test": "jest --runInBand"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.12.0",
+    "nanoid": "^3.3.8",
+    "nodemailer": "^9.0.3"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^10.4.3",
+    "supertest": "^7.0.0"
+  }
+}

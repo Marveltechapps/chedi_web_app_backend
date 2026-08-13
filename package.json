@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js",
+    "dev": "node --watch --watch-path=server.js --watch-path=app.js --watch-path=config --watch-path=routes --watch-path=services --watch-path=lib --watch-path=middleware --watch-path=utils server.js",
     "dev:memory": "node scripts/dev-memory.js",
     "seed": "node seed/seed.js",
     "seed:dummy": "node scripts/seed-dummy-five.js",

@@ -7,6 +7,7 @@ require('dotenv').config();
 async function main() {
   const { MongoMemoryServer } = require('mongodb-memory-server');
   const mongod = await MongoMemoryServer.create();
+  process.env.CHEDI_USE_MEMORY_MONGO = 'true';
   process.env.MONGODB_URI = mongod.getUri();
   process.env.MONGODB_DB = process.env.MONGODB_DB || 'chedi_csa';
   process.env.ALLOW_DEMO_OTP = process.env.ALLOW_DEMO_OTP || 'true';

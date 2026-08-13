@@ -2,6 +2,29 @@ const express = require('express');
 const cors = require('cors');
 const { nanoid } = require('nanoid');
 const { errorHandler, notFoundHandler } = require('./lib/errors');
+const { isDbReady } = require('./config/db');
+
+const REQUEST_TIMEOUT_MS = Number(process.env.HTTP_REQUEST_TIMEOUT_MS || 30000);
+
+function requestTimeout(ms) {
+  return (req, res, next) => {
+    res.setTimeout(ms, () => {
+      if (res.headersSent) return;
+      console.error(`[http] request timeout ${req.method} ${req.originalUrl}`);
+      res.status(504).json({
+        success: false,
+        message: 'Request timed out. Please try again.',
+        error: {
+          code: 'TIMEOUT',
+          message: 'Request timed out. Please try again.',
+          details: [],
+          requestId: req.requestId,
+        },
+      });
+    });
+    next();
+  };
+}
 
 function createApp() {
   const app = express();
@@ -14,6 +37,7 @@ function createApp() {
     })
   );
   app.use(express.json({ limit: '1mb' }));
+  app.use(requestTimeout(REQUEST_TIMEOUT_MS));
 
   app.use((req, _res, next) => {
     req.requestId = req.get('X-Request-Id') || `req_${nanoid(10)}`;
@@ -21,7 +45,13 @@ function createApp() {
   });
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, service: 'chediwebapp-backend', version: '1.0.0' });
+    res.json({
+      ok: true,
+      success: true,
+      service: 'chediwebapp-backend',
+      version: '1.0.0',
+      db: isDbReady(),
+    });
   });
 
   const api = express.Router();

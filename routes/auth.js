@@ -1,6 +1,8 @@
 const express = require('express');
 const { normalizeEmail, isValidEmail, displayEmail } = require('../lib/email');
+const { normalizePhone, isValidIndianMobile } = require('../lib/phone');
 const { ApiError } = require('../lib/errors');
+const { asyncHandler } = require('../lib/asyncHandler');
 const { findMemberByEmail, toMemberSummary } = require('../lib/members');
 const otpService = require('../services/otp.service');
 const jwtService = require('../services/jwt.service');
@@ -13,73 +15,84 @@ function otpCodePattern() {
   return new RegExp(`^\\d{${len}}$`);
 }
 
-router.post('/otp', async (req, res, next) => {
-  try {
-    const email = normalizeEmail(req.body?.email);
-    if (!email || !isValidEmail(email)) {
-      throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid email address', [
-        { field: 'email', message: 'Invalid email address' },
+function successOtpPayload(timing, email) {
+  const payload = {
+    success: true,
+    message: 'OTP sent successfully',
+    ok: true,
+    email,
+    emailDisplay: displayEmail(email),
+    notice: `Code sent to ${email}.`,
+    resendAvailableInSeconds: timing.resendAvailableInSeconds,
+    otpExpiresInSeconds: timing.otpExpiresInSeconds,
+  };
+  if (otpService.allowDemoOtp()) {
+    payload.demoOtp = otpService.demoOtp();
+    payload.notice = `${payload.notice} (demo code ${payload.demoOtp})`;
+  }
+  return payload;
+}
+
+function validateOtpDestination(body) {
+  const email = normalizeEmail(body?.email);
+  const rawPhone = body?.phone || body?.mobile || body?.newPhone;
+
+  if (!email && rawPhone != null && String(rawPhone).trim() !== '') {
+    const phone = normalizePhone(String(rawPhone));
+    if (!phone || !isValidIndianMobile(phone)) {
+      throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid phone number', [
+        { field: 'phone', message: 'Invalid phone number' },
       ]);
     }
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid email address', [
+      { field: 'email', message: 'Login OTP requires an email address' },
+    ]);
+  }
 
-    // Avoid enumeration: always succeed for valid format; OTP still sent
+  if (!email || !isValidEmail(email)) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid email address', [
+      { field: 'email', message: 'Invalid email address' },
+    ]);
+  }
+
+  return email;
+}
+
+router.post(
+  '/otp',
+  asyncHandler(async (req, res) => {
+    const email = validateOtpDestination(req.body);
+
     const timing = await otpService.sendOtp({
       purpose: 'login',
       email,
       channel: 'email',
     });
-    const payload = {
-      ok: true,
-      email,
-      emailDisplay: displayEmail(email),
-      notice: `Code sent to ${email}.`,
-      resendAvailableInSeconds: timing.resendAvailableInSeconds,
-      otpExpiresInSeconds: timing.otpExpiresInSeconds,
-    };
-    // Dev/demo only: expose OTP so local testing works without a real mailbox
-    if (otpService.allowDemoOtp()) {
-      payload.demoOtp = otpService.demoOtp();
-      payload.notice = `${payload.notice} (demo code ${payload.demoOtp})`;
-    }
-    res.json(payload);
-  } catch (err) {
-    next(err);
-  }
-});
+    res.json(successOtpPayload(timing, email));
+  })
+);
 
-router.post('/otp/resend', async (req, res, next) => {
-  try {
-    const email = normalizeEmail(req.body?.email);
-    if (!email || !isValidEmail(email)) {
-      throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid email address', [
-        { field: 'email', message: 'Invalid email address' },
-      ]);
-    }
+router.post(
+  '/otp/resend',
+  asyncHandler(async (req, res) => {
+    const email = validateOtpDestination(req.body);
     const timing = await otpService.sendOtp({
       purpose: 'login',
       email,
       channel: 'email',
     });
-    const payload = {
-      ok: true,
-      email,
-      emailDisplay: displayEmail(email),
-      notice: 'A new code has been sent to your email.',
-      resendAvailableInSeconds: timing.resendAvailableInSeconds,
-      otpExpiresInSeconds: timing.otpExpiresInSeconds,
-    };
+    const payload = successOtpPayload(timing, email);
+    payload.notice = 'A new code has been sent to your email.';
     if (otpService.allowDemoOtp()) {
-      payload.demoOtp = otpService.demoOtp();
       payload.notice = `${payload.notice} (demo code ${payload.demoOtp})`;
     }
     res.json(payload);
-  } catch (err) {
-    next(err);
-  }
-});
+  })
+);
 
-router.post('/otp/verify', async (req, res, next) => {
-  try {
+router.post(
+  '/otp/verify',
+  asyncHandler(async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     const code = String(req.body?.code || '').trim();
     if (!email || !isValidEmail(email)) {
@@ -108,17 +121,18 @@ router.post('/otp/verify', async (req, res, next) => {
     const summary = toMemberSummary(member);
     const tokens = await jwtService.issueTokens(summary);
     res.json({
+      success: true,
+      message: 'OTP verified',
       ok: true,
       ...tokens,
       member: summary,
     });
-  } catch (err) {
-    next(err);
-  }
-});
+  })
+);
 
-router.post('/refresh', async (req, res, next) => {
-  try {
+router.post(
+  '/refresh',
+  asyncHandler(async (req, res) => {
     const refreshToken = req.body?.refreshToken;
     if (!refreshToken) {
       throw new ApiError(400, 'VALIDATION_ERROR', 'refreshToken is required', [
@@ -127,27 +141,25 @@ router.post('/refresh', async (req, res, next) => {
     }
     const result = await jwtService.refreshTokens(refreshToken);
     res.json(result);
-  } catch (err) {
-    next(err);
-  }
-});
+  })
+);
 
-router.post('/logout', requireMember, async (req, res, next) => {
-  try {
+router.post(
+  '/logout',
+  requireMember,
+  asyncHandler(async (req, res) => {
     await jwtService.revokeRefreshToken(req.body?.refreshToken);
-    res.json({ ok: true });
-  } catch (err) {
-    next(err);
-  }
-});
+    res.json({ ok: true, success: true });
+  })
+);
 
-router.post('/sessions/revoke-all', requireMember, async (req, res, next) => {
-  try {
+router.post(
+  '/sessions/revoke-all',
+  requireMember,
+  asyncHandler(async (req, res) => {
     const revokedCount = await jwtService.revokeAllSessions(req.member.id);
-    res.json({ ok: true, revokedCount });
-  } catch (err) {
-    next(err);
-  }
-});
+    res.json({ ok: true, success: true, revokedCount });
+  })
+);
 
 module.exports = router;

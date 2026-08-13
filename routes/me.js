@@ -99,6 +99,8 @@ router.post('/phone/otp', requireMember, async (req, res, next) => {
       },
     });
     const payload = {
+      success: true,
+      message: 'OTP sent successfully',
       ok: true,
       notice: memberEmail
         ? `Code sent to ${memberEmail} to confirm this number change.`

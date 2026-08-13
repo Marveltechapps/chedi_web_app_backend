@@ -4,6 +4,9 @@
  */
 
 const nodemailer = require('nodemailer');
+const { withTimeout } = require('../lib/timeout');
+
+const SMTP_TIMEOUT_MS = Number(process.env.OTP_SMTP_TIMEOUT_MS || 18000);
 
 let transporter = null;
 
@@ -11,11 +14,15 @@ function gmailConfigured() {
   return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 }
 
+function attachTransporterGuards(tx) {
+  tx.on('error', (err) => {
+    console.error('[email] transporter error:', err && err.message ? err.message : err);
+  });
+}
+
 function getTransporter() {
   if (!gmailConfigured()) {
-    const err = new Error(
-      'Email delivery is not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD.'
-    );
+    const err = new Error('Email delivery is not configured.');
     err.code = 'EMAIL_NOT_CONFIGURED';
     err.status = 503;
     throw err;
@@ -27,7 +34,14 @@ function getTransporter() {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_APP_PASSWORD,
       },
+      connectionTimeout: SMTP_TIMEOUT_MS,
+      greetingTimeout: SMTP_TIMEOUT_MS,
+      socketTimeout: SMTP_TIMEOUT_MS,
+      tls: {
+        minVersion: 'TLSv1.2',
+      },
     });
+    attachTransporterGuards(transporter);
   }
   return transporter;
 }
@@ -63,6 +77,16 @@ function otpText({ code, purpose }) {
   return `Your CHEDI verification code is ${code}. Use it to ${action}. It expires in a few minutes. If you did not request this, you can ignore this email.`;
 }
 
+async function fetchWithTimeout(url, options, ms) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: ac.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Append a non-sensitive row to Google Sheets via Apps Script webhook.
  * Never includes the OTP code.
@@ -71,17 +95,21 @@ async function logOtpEventToSheets({ to, purpose }) {
   const url = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
   if (!url) return;
   try {
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'otp_sent',
-        email: to,
-        purpose,
-        at: new Date().toISOString(),
-        sheetsUrl: process.env.GOOGLE_SHEETS_URL || undefined,
-      }),
-    });
+    await fetchWithTimeout(
+      url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'otp_sent',
+          email: to,
+          purpose,
+          at: new Date().toISOString(),
+          sheetsUrl: process.env.GOOGLE_SHEETS_URL || undefined,
+        }),
+      },
+      5000
+    );
   } catch (err) {
     console.warn('[email] Google Sheets log failed:', err.message);
   }
@@ -98,12 +126,16 @@ async function notifySupport({ to, purpose }) {
   if (String(support).toLowerCase() === String(to).toLowerCase()) return;
   try {
     const tx = getTransporter();
-    await tx.sendMail({
-      from: `"CHEDI" <${process.env.GMAIL_USER}>`,
-      to: support,
-      subject: `[CHEDI] OTP requested (${purpose})`,
-      text: `An OTP was requested for ${to} (purpose: ${purpose}) at ${new Date().toISOString()}.`,
-    });
+    await withTimeout(
+      tx.sendMail({
+        from: `"CHEDI" <${process.env.GMAIL_USER}>`,
+        to: support,
+        subject: `[CHEDI] OTP requested (${purpose})`,
+        text: `An OTP was requested for ${to} (purpose: ${purpose}) at ${new Date().toISOString()}.`,
+      }),
+      SMTP_TIMEOUT_MS,
+      'Support notify timed out'
+    );
   } catch (err) {
     console.warn('[email] Support notify failed:', err.message);
   }
@@ -121,24 +153,37 @@ async function sendOtpEmail({ to, code, purpose = 'login' }) {
   const text = otpText({ code, purpose });
   const html = otpHtml({ code, purpose });
 
-  const tx = getTransporter();
-  const info = await tx.sendMail({
-    from: `"CHEDI" <${process.env.GMAIL_USER}>`,
-    to,
-    subject,
-    text,
-    html,
-  });
+  try {
+    const tx = getTransporter();
+    const info = await withTimeout(
+      tx.sendMail({
+        from: `"CHEDI" <${process.env.GMAIL_USER}>`,
+        to,
+        subject,
+        text,
+        html,
+      }),
+      SMTP_TIMEOUT_MS,
+      'OTP email send timed out'
+    );
+    console.log(`[email] OTP sent → ${to} purpose=${purpose} messageId=${info.messageId || 'n/a'}`);
 
-  console.log(`[email] OTP sent → ${to} purpose=${purpose} messageId=${info.messageId || 'n/a'}`);
+    Promise.allSettled([
+      logOtpEventToSheets({ to, purpose }),
+      notifySupport({ to, purpose }),
+    ]).catch((err) => {
+      console.warn('[email] side-effect failed:', err && err.message);
+    });
 
-  // Fire-and-forget side effects (do not block login on sheets/support failures)
-  Promise.allSettled([
-    logOtpEventToSheets({ to, purpose }),
-    notifySupport({ to, purpose }),
-  ]).catch(() => {});
-
-  return { ok: true, to, subject, messageId: info.messageId || null };
+    return { ok: true, to, subject, messageId: info.messageId || null };
+  } catch (err) {
+    const wrapped = new Error('Unable to send OTP. Please try again.');
+    wrapped.code = err.code === 'TIMEOUT' || err.code === 'ETIMEDOUT' ? 'TIMEOUT' : 'OTP_DELIVERY_FAILED';
+    wrapped.status = wrapped.code === 'TIMEOUT' ? 504 : 502;
+    wrapped.cause = err;
+    console.error('[email] send failed:', err && err.message ? err.message : err);
+    throw wrapped;
+  }
 }
 
 module.exports = {

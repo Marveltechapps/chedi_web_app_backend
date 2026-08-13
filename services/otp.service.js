@@ -1,8 +1,13 @@
-const { getDB } = require('../config/db');
+const { getDB, ensureDB } = require('../config/db');
 const { getRedis } = require('../config/redis');
 const { hashOtp, compareOtp } = require('../utils/hash');
 const { generateOtp } = require('../utils/otpGenerator');
 const { sendOtpEmail, gmailConfigured } = require('./email.service');
+const { sendOtpSms, smsConfigured } = require('./sms.service');
+const { withTimeout } = require('../lib/timeout');
+const { isMongoUnavailableError } = require('../lib/errors');
+
+const DB_TIMEOUT_MS = Number(process.env.OTP_DB_TIMEOUT_MS || 15000);
 
 function ttlSeconds() {
   return Number(process.env.OTP_TTL_SECONDS || 300);
@@ -41,6 +46,30 @@ function redisKey(purpose, target) {
   return `otp:${purpose}:${target}`;
 }
 
+function wrapDbError(err) {
+  if (isMongoUnavailableError(err) || err.code === 'TIMEOUT' || err.code === 'DB_UNAVAILABLE') {
+    const wrapped = new Error('Database service temporarily unavailable');
+    wrapped.status = 503;
+    wrapped.code = 'DB_UNAVAILABLE';
+    wrapped.cause = err;
+    return wrapped;
+  }
+  return err;
+}
+
+async function dbOp(label, fn, { log = false } = {}) {
+  try {
+    if (log) console.log('[OTP] Database operation started');
+    await ensureDB();
+    const result = await withTimeout(fn(), DB_TIMEOUT_MS, `OTP ${label} timed out`);
+    if (log) console.log('[OTP] Database operation completed');
+    return result;
+  } catch (err) {
+    console.error(`[OTP] Database operation failed: ${err && err.message ? err.message : err}`);
+    throw wrapDbError(err);
+  }
+}
+
 async function storeOtp({ purpose, target, code, meta = {}, channel = 'email' }) {
   const hashed = hashOtp(code);
   const expiresAt = new Date(Date.now() + ttlSeconds() * 1000);
@@ -59,73 +88,113 @@ async function storeOtp({ purpose, target, code, meta = {}, channel = 'email' })
     meta,
   };
 
-  const redis = getRedis();
-  if (redis) {
-    await redis.set(redisKey(purpose, target), JSON.stringify(payload), {
-      EX: ttlSeconds(),
-    });
-  }
+  return dbOp('store', async () => {
+    const redis = getRedis();
+    if (redis) {
+      await redis.set(redisKey(purpose, target), JSON.stringify(payload), {
+        EX: ttlSeconds(),
+      });
+    }
 
-  const db = getDB();
-  await db.collection('otps').updateOne(
-    { purpose, target },
-    { $set: payload },
-    { upsert: true }
-  );
+    const db = getDB();
+    await db.collection('otps').updateOne(
+      { purpose, target },
+      { $set: payload },
+      { upsert: true }
+    );
 
-  return {
-    otpExpiresInSeconds: ttlSeconds(),
-    resendAvailableInSeconds: resendCooldown(),
-  };
+    return {
+      otpExpiresInSeconds: ttlSeconds(),
+      resendAvailableInSeconds: resendCooldown(),
+    };
+  }, { log: true });
 }
 
 async function getOtpRecord(purpose, target) {
-  const redis = getRedis();
-  if (redis) {
-    const raw = await redis.get(redisKey(purpose, target));
-    if (raw) return JSON.parse(raw);
-  }
-  const db = getDB();
-  return (
-    (await db.collection('otps').findOne({ purpose, target })) ||
-    (await db.collection('otps').findOne({ purpose, phone: target }))
-  );
+  return dbOp('read', async () => {
+    const redis = getRedis();
+    if (redis) {
+      const raw = await redis.get(redisKey(purpose, target));
+      if (raw) return JSON.parse(raw);
+    }
+    const db = getDB();
+    return (
+      (await db.collection('otps').findOne({ purpose, target })) ||
+      (await db.collection('otps').findOne({ purpose, phone: target }))
+    );
+  });
 }
 
 async function persistOtpRecord(record) {
   const target = record.target || record.phone || record.email;
-  const redis = getRedis();
-  if (redis) {
-    const remaining = Math.max(
-      1,
-      Math.floor((new Date(record.expiresAt).getTime() - Date.now()) / 1000)
+  return dbOp('persist', async () => {
+    const redis = getRedis();
+    if (redis) {
+      const remaining = Math.max(
+        1,
+        Math.floor((new Date(record.expiresAt).getTime() - Date.now()) / 1000)
+      );
+      await redis.set(redisKey(record.purpose, target), JSON.stringify(record), {
+        EX: remaining,
+      });
+    }
+    const db = getDB();
+    await db.collection('otps').updateOne(
+      { purpose: record.purpose, target },
+      { $set: { ...record, target } },
+      { upsert: true }
     );
-    await redis.set(redisKey(record.purpose, target), JSON.stringify(record), {
-      EX: remaining,
-    });
-  }
-  const db = getDB();
-  await db.collection('otps').updateOne(
-    { purpose: record.purpose, target },
-    { $set: { ...record, target } },
-    { upsert: true }
-  );
+  });
 }
 
 async function clearOtp(purpose, target) {
-  const redis = getRedis();
-  if (redis) await redis.del(redisKey(purpose, target));
-  const db = getDB();
-  await db.collection('otps').deleteMany({
-    purpose,
-    $or: [{ target }, { phone: target }, { email: target }],
+  return dbOp('clear', async () => {
+    const redis = getRedis();
+    if (redis) await redis.del(redisKey(purpose, target));
+    const db = getDB();
+    await db.collection('otps').deleteMany({
+      purpose,
+      $or: [{ target }, { phone: target }, { email: target }],
+    });
   });
+}
+
+async function deliverOtp({ deliveryChannel, dest, mailTo, code, purpose }) {
+  console.log('[OTP] SMS request started');
+  try {
+    if (deliveryChannel === 'sms' && smsConfigured()) {
+      await sendOtpSms({ to: dest, code, purpose });
+    } else if (mailTo) {
+      if (gmailConfigured()) {
+        await sendOtpEmail({ to: mailTo, code, purpose });
+      } else if (allowDemoOtp()) {
+        console.log(`[email/demo] ${purpose} OTP queued for ${mailTo}`);
+      } else {
+        const err = new Error('Unable to send OTP. Please try again.');
+        err.code = 'EMAIL_NOT_CONFIGURED';
+        err.status = 503;
+        throw err;
+      }
+    } else if (allowDemoOtp()) {
+      console.log(`[otp/demo] ${purpose} OTP generated for configured demo mode`);
+    } else {
+      const err = new Error('Unable to send OTP. Please try again.');
+      err.code = 'OTP_DELIVERY_FAILED';
+      err.status = 503;
+      throw err;
+    }
+    console.log('[OTP] SMS request completed');
+  } catch (err) {
+    console.error('[OTP] SMS request failed:', err && err.message ? err.message : err);
+    throw err;
+  }
 }
 
 /**
  * Send OTP to email (login) or phone target (phone_change — delivered by email when SMTP is configured).
  */
 async function sendOtp({ purpose, phone, email, target, channel, meta = {} }) {
+  console.log('[OTP] Request received');
   const dest = resolveTarget({ target, phone, email });
   if (!dest) {
     const err = new Error('OTP destination is required');
@@ -169,30 +238,8 @@ async function sendOtp({ purpose, phone, email, target, channel, meta = {} }) {
   const mailTo =
     deliveryChannel === 'email' ? dest : meta.deliveryEmail || null;
 
-  if (mailTo) {
-    if (gmailConfigured()) {
-      await sendOtpEmail({ to: mailTo, code, purpose });
-    } else if (allowDemoOtp()) {
-      console.log(`[email/demo] ${purpose} OTP → ${mailTo} | code=${code}`);
-    } else {
-      const err = new Error(
-        'Email delivery is not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD.'
-      );
-      err.code = 'EMAIL_NOT_CONFIGURED';
-      err.status = 503;
-      throw err;
-    }
-  } else if (allowDemoOtp()) {
-    console.log(`[otp/sms-demo] ${purpose} → ${dest} code=${code}`);
-  } else {
-    const err = new Error(
-      'Unable to deliver OTP. Email delivery is required (no SMS provider configured).'
-    );
-    err.code = 'OTP_DELIVERY_FAILED';
-    err.status = 503;
-    throw err;
-  }
-
+  await deliverOtp({ deliveryChannel, dest, mailTo, code, purpose });
+  console.log('[OTP] Request completed');
   return timing;
 }
 

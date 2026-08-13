@@ -261,14 +261,15 @@ async function seed() {
   console.log('Seed complete.');
   console.log('  Demo member: Priya Balan · +919840012345');
   console.log('  Demo OTP (non-prod): 1234');
-  await closeDB();
 }
 
 if (require.main === module) {
-  seed().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  seed()
+    .then(() => closeDB())
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
 }
 
 module.exports = { seed };

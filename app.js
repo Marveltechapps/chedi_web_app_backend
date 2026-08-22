@@ -3,6 +3,7 @@ const cors = require('cors');
 const { nanoid } = require('nanoid');
 const { errorHandler, notFoundHandler } = require('./lib/errors');
 const { isDbReady } = require('./config/db');
+const { corsOptions } = require('./lib/cors');
 
 const REQUEST_TIMEOUT_MS = Number(process.env.HTTP_REQUEST_TIMEOUT_MS || 30000);
 
@@ -28,14 +29,9 @@ function requestTimeout(ms) {
 
 function createApp() {
   const app = express();
+  app.set('trust proxy', 1);
 
-  const corsOrigin = process.env.CORS_ORIGIN || '*';
-  app.use(
-    cors({
-      origin: corsOrigin === '*' ? true : corsOrigin.split(',').map((s) => s.trim()),
-      credentials: true,
-    })
-  );
+  app.use(cors(corsOptions()));
   app.use(express.json({ limit: '1mb' }));
   app.use(requestTimeout(REQUEST_TIMEOUT_MS));
 

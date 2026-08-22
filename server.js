@@ -1,9 +1,11 @@
 require('dotenv').config();
 
+const http = require('http');
 const { createApp } = require('./app');
 const { connectDB, isMemoryFallback, isDbReady } = require('./config/db');
 const { initRedis } = require('./config/redis');
 const { redactSecrets } = require('./lib/errors');
+const { attachRealtime } = require('./lib/realtime');
 
 const REQUEST_TIMEOUT_MS = Number(process.env.HTTP_REQUEST_TIMEOUT_MS || 30000);
 
@@ -36,9 +38,12 @@ async function main() {
   await initRedis();
 
   const app = createApp();
-  const server = app.listen(port, host, () => {
+  const server = http.createServer(app);
+  attachRealtime(server);
+  server.listen(port, host, () => {
     console.log(`[server] CHEDI CSA API listening on http://${host}:${port}`);
     console.log(`[server] Base paths: /api/v1  and  /api`);
+    console.log(`[server] Socket.IO path: /socket.io`);
     console.log(`[server] database ready=${isDbReady()}`);
   });
 

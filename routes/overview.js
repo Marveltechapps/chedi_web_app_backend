@@ -3,15 +3,9 @@ const { getDB } = require('../config/db');
 const { requireMember } = require('../middleware/auth');
 const { toMemberSummary } = require('../lib/members');
 const { toSubscription, toPlan } = require('../lib/serializers');
+const { growingNowForPlot } = require('../lib/growingNow');
 
 const router = express.Router();
-
-const GROWING_NOW = [
-  { name: 'Tomato', stage: 'Fruiting' },
-  { name: 'Spinach', stage: 'Ready' },
-  { name: 'Brinjal', stage: 'Flowering' },
-  { name: 'Carrot', stage: 'Growing' },
-];
 
 const LEASE_TEASER = [
   { step: 1, title: 'Pick a plot' },
@@ -72,7 +66,7 @@ router.get('/', requireMember, async (req, res, next) => {
       hasPlot,
       activeSubscription: hasPlot ? activeSubscription : null,
       nextDelivery: hasPlot ? nextDelivery : null,
-      growingNow: hasPlot ? GROWING_NOW : [],
+      growingNow: hasPlot ? await growingNowForPlot(activeSubscription.plotKey) : [],
       leaseTeaser: hasPlot ? undefined : LEASE_TEASER,
     });
   } catch (err) {

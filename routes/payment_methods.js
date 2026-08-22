@@ -7,6 +7,7 @@ const {
   addCardMethod,
   validateCard,
 } = require('../lib/payments');
+const realtime = require('../lib/realtime');
 
 const router = express.Router();
 
@@ -33,6 +34,9 @@ router.post('/', requireMember, async (req, res, next) => {
       card,
       Boolean(body.setPrimary)
     );
+    await realtime.emitSafe(
+      realtime.notifyPaymentMethodChange(req.member.id, { paymentMethod })
+    );
     res.status(201).json({ ok: true, paymentMethod });
   } catch (err) {
     next(err);
@@ -57,6 +61,9 @@ router.post('/:id/primary', requireMember, async (req, res, next) => {
       { $set: { isPrimary: true } }
     );
     const items = await listPaymentMethods(req.member.id);
+    await realtime.emitSafe(
+      realtime.notifyPaymentMethodChange(req.member.id, { items })
+    );
     res.json({ ok: true, items });
   } catch (err) {
     next(err);
@@ -89,6 +96,7 @@ router.delete('/:id', requireMember, async (req, res, next) => {
         );
       }
     }
+    await realtime.emitSafe(realtime.notifyPaymentMethodChange(req.member.id, { items: null }));
     res.json({ ok: true });
   } catch (err) {
     next(err);

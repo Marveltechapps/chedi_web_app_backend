@@ -2,6 +2,9 @@ const express = require('express');
 const { getDB } = require('../config/db');
 const { ApiError } = require('../lib/errors');
 const { requireMember } = require('../middleware/auth');
+const { nextSeq } = require('../lib/admin/ids');
+const { publishedBasket } = require('../lib/admin/baskets.service');
+const realtime = require('../lib/realtime');
 
 const router = express.Router();
 
@@ -16,6 +19,23 @@ const DEFAULT_BASKET = [
   { name: 'Spinach', qty: '1 bunch', imageUrl: null },
   { name: 'Mint', qty: '1 bunch', imageUrl: null },
 ];
+
+async function currentBasketItems() {
+  try {
+    const published = await publishedBasket();
+    if (published?.items?.length) {
+      return published.items.map((i) => ({
+        name: i.cropName,
+        qty: `${i.qty} ${i.unit}`,
+        imageUrl: null,
+        supp: Boolean(i.supp),
+      }));
+    }
+  } catch {
+    // catalogs may be empty before admin seed
+  }
+  return DEFAULT_BASKET;
+}
 
 function buildTracking(deliveryDate) {
   const d = new Date(deliveryDate + 'T00:00:00Z');
@@ -95,6 +115,7 @@ router.get('/', requireMember, async (req, res, next) => {
       .toArray();
 
     const current = schedule.find((d) => !d.cancelled) || schedule[0];
+    const basket = await currentBasketItems();
 
     res.json({
       hasPlot: true,
@@ -104,9 +125,9 @@ router.get('/', requireMember, async (req, res, next) => {
             label: current.label,
             date: current.date,
             dateLabel: current.dateLabel,
-            varietyCount: 9,
+            varietyCount: basket.length || 9,
             tracking: buildTracking(current.date),
-            basket: DEFAULT_BASKET,
+            basket,
           }
         : null,
       schedule: schedule.map((d) => ({
@@ -140,9 +161,30 @@ router.post('/:deliveryId/cancel', requireMember, async (req, res, next) => {
     if (delivery.cancelled) {
       throw new ApiError(409, 'ALREADY_CANCELLED', 'Delivery already cancelled');
     }
+
+    const seq = await nextSeq('cancellation', 1);
+    const request = {
+      id: `CX-${String(seq).padStart(2, '0')}`,
+      deliveryId: delivery.id,
+      memberId: req.member.id,
+      memberCode: req.member.memberCode,
+      memberName: req.member.name,
+      date: delivery.date,
+      dateLabel: delivery.dateLabel,
+      reason: req.body?.reason || '',
+      locked: Boolean(delivery.locked || !delivery.cancellable),
+      status: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
     if (delivery.locked || !delivery.cancellable) {
+      await db.collection('cancellation_requests').insertOne(request);
       throw new ApiError(400, 'DELIVERY_LOCKED', 'This delivery cannot be cancelled');
     }
+
+    request.status = 'approved';
+    await db.collection('cancellation_requests').insertOne(request);
 
     await db.collection('deliveries').updateOne(
       { id: delivery.id },
@@ -151,10 +193,24 @@ router.post('/:deliveryId/cancel', requireMember, async (req, res, next) => {
           cancelled: true,
           cancellable: false,
           locked: true,
+          opsStatus: 'cancelled',
           cancelReason: req.body?.reason || null,
           cancelledAt: new Date(),
         },
       }
+    );
+
+    await realtime.emitSafe(
+      Promise.all([
+        realtime.notifyDeliveryChange({
+          memberId: req.member.id,
+          delivery: { id: delivery.id, cancelled: true, opsStatus: 'cancelled' },
+        }),
+        realtime.notifyCancellationChange({
+          memberId: req.member.id,
+          cancellation: request,
+        }),
+      ])
     );
 
     res.json({

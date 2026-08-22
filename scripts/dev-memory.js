@@ -20,9 +20,11 @@ async function main() {
   const { seed } = require('../seed/seed');
   await seed();
 
+  const http = require('http');
   const { connectDB } = require('../config/db');
   const { initRedis } = require('../config/redis');
   const { createApp } = require('../app');
+  const { attachRealtime } = require('../lib/realtime');
 
   await connectDB();
   console.log(`[db] connected (${process.env.MONGODB_DB})`);
@@ -31,8 +33,11 @@ async function main() {
   const host = process.env.HOST || '0.0.0.0';
   const port = Number(process.env.PORT || 4000);
   const app = createApp();
-  app.listen(port, host, () => {
+  const server = http.createServer(app);
+  attachRealtime(server);
+  server.listen(port, host, () => {
     console.log(`[server] CHEDI CSA API (memory) on http://${host}:${port}`);
+    console.log(`[server] Socket.IO path: /socket.io`);
     console.log(`[server] Demo login: priya@email.com / OTP ${process.env.DEMO_OTP}`);
   });
 

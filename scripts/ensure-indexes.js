@@ -45,6 +45,22 @@ async function ensureIndexes() {
     { key: { memberId: 1, createdAt: -1 } },
   ]);
   await db.collection('registrations').createIndexes([{ key: { id: 1 }, unique: true }]);
+  await db.collection('staff').createIndexes([
+    { key: { id: 1 }, unique: true },
+    { key: { email: 1 }, unique: true },
+  ]);
+  await db.collection('staff_sessions').createIndexes([
+    { key: { token: 1 }, unique: true },
+    { key: { staffId: 1 } },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+  await db.collection('audit_log').createIndexes([{ key: { createdAt: -1 } }, { key: { actorId: 1 } }]);
+  await db.collection('crops').createIndexes([{ key: { key: 1 }, unique: true }]);
+  await db.collection('cultivations').createIndexes([{ key: { plotKey: 1 }, unique: true }]);
+  await db.collection('baskets').createIndexes([{ key: { id: 1 }, unique: true }]);
+  await db.collection('tickets').createIndexes([{ key: { id: 1 }, unique: true }, { key: { memberId: 1 } }]);
+  await db.collection('cancellation_requests').createIndexes([{ key: { id: 1 }, unique: true }]);
+  await db.collection('notifications_sent').createIndexes([{ key: { createdAt: -1 } }]);
 
   console.log('Indexes ensured.');
   await closeDB();

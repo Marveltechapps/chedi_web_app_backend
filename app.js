@@ -70,6 +70,7 @@ function createApp() {
   api.use('/notifications', require('./routes/notifications'));
   api.use('/support', require('./routes/support'));
   api.use('/legal', require('./routes/legal'));
+  api.use('/admin', require('./routes/adminConsole'));
   api.use('/admin', require('./routes/admin'));
 
   app.use('/api/v1', api);

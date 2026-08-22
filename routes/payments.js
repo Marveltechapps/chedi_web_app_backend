@@ -11,6 +11,7 @@ const {
   createLeasePaymentRequest,
   createRenewalPaymentRequest,
 } = require('../lib/payments');
+const realtime = require('../lib/realtime');
 
 const router = express.Router();
 
@@ -105,6 +106,14 @@ router.post('/', requireMember, async (req, res, next) => {
         'Use POST /membership/payments for membership join payments'
       );
     });
+    if (result.body?.payment) {
+      await realtime.emitSafe(
+        realtime.notifyPaymentChange(realtime.EVENTS.PAYMENT_CREATED, {
+          payment: result.body.payment,
+          memberId: req.member.id,
+        })
+      );
+    }
     res.status(result.status).json(result.body);
   } catch (err) {
     next(err);

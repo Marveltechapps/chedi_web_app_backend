@@ -31,6 +31,18 @@ async function seed() {
     'plot_notifications',
     'data_exports',
     'counters',
+    'staff',
+    'staff_sessions',
+    'audit_log',
+    'farms',
+    'crops',
+    'cultivations',
+    'baskets',
+    'cancellation_requests',
+    'tickets',
+    'notification_templates',
+    'notifications_sent',
+    'app_settings',
   ];
   for (const name of collections) {
     await db.collection(name).deleteMany({});
@@ -89,10 +101,14 @@ async function seed() {
     phoneDisplay: displayPhone('+919840012345'),
     email: 'priya@email.com',
     isMember: true,
+    accountStatus: 'active',
+    subStatus: 'active',
     memberSince,
     hasPlot: true,
     plotCount: 1,
     statusLabel: 'Subscribed · active',
+    planKey: 'family8',
+    plotKey: 'sivaganga-1',
     preferences: {
       notifications: { delivery: true, harvest: true, promos: false },
       channel: 'push',
@@ -193,9 +209,13 @@ async function seed() {
       amountInr: 500,
       amountFormatted: formatInr(500),
       currency: 'INR',
-      method: 'card',
+      method: 'bank_transfer',
       label: 'Farm Club membership (one-time)',
       date: '2026-07-20',
+      dueDate: '2026-07-27',
+      collectedAt: '2026-07-20',
+      approvedAt: activatedAt,
+      approvedBy: 'sundar',
       receiptUrl: null,
       metadata: {},
       createdAt: activatedAt,
@@ -210,9 +230,13 @@ async function seed() {
       amountInr: 250000,
       amountFormatted: formatInr(250000),
       currency: 'INR',
-      method: 'card',
+      method: 'bank_transfer',
       label: 'Annual subscription · Sivaganga-1 · Family of 8',
       date: '2026-07-20',
+      dueDate: '2026-07-27',
+      collectedAt: '2026-07-20',
+      approvedAt: activatedAt,
+      approvedBy: 'sundar',
       receiptUrl: null,
       metadata: { plotKey: 'sivaganga-1', planKey: 'family8', subscriptionId: 'sub_demo_sivaganga' },
       createdAt: activatedAt,
@@ -221,6 +245,9 @@ async function seed() {
   ]);
 
   await seedDeliverySchedule('0500', 'sub_demo_sivaganga');
+
+  const { seedAdmin } = require('./adminSeed');
+  const admin = await seedAdmin(db);
 
   await db.collection('notifications').insertMany([
     {
@@ -259,8 +286,9 @@ async function seed() {
   ]);
 
   console.log('Seed complete.');
-  console.log('  Demo member: Priya Balan · +919840012345');
+  console.log('  Demo member: Priya Balan · priya@email.com');
   console.log('  Demo OTP (non-prod): 1234');
+  console.log(`  Staff login: anitha@chedi.in / ${admin.staffPassword}`);
 }
 
 if (require.main === module) {

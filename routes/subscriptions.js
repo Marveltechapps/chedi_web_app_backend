@@ -12,6 +12,7 @@ const {
   createSubscriptionFromPayment,
   DELIVERY_CHARGE_INR,
 } = require('../lib/payments');
+const realtime = require('../lib/realtime');
 
 const router = express.Router();
 
@@ -128,6 +129,14 @@ router.post('/', requireMember, async (req, res, next) => {
       });
       return { status: 201, body: subscription };
     });
+    if (result.status < 400) {
+      await realtime.emitSafe(
+        realtime.notifySubscriptionChange(realtime.EVENTS.SUBSCRIPTION_CREATED, {
+          memberId: req.member.id,
+          subscription: result.body,
+        })
+      );
+    }
     res.status(result.status).json(result.body);
   } catch (err) {
     next(err);
@@ -171,6 +180,14 @@ router.post('/:subscriptionId/renewal-payments', requireMember, async (req, res,
       });
       return { status: 200, body };
     });
+    if (result.body?.payment) {
+      await realtime.emitSafe(
+        realtime.notifyPaymentChange(realtime.EVENTS.PAYMENT_CREATED, {
+          payment: result.body.payment,
+          memberId: req.member.id,
+        })
+      );
+    }
     res.status(result.status).json(result.body);
   } catch (err) {
     next(err);

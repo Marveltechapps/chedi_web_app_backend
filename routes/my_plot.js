@@ -2,15 +2,9 @@ const express = require('express');
 const { getDB } = require('../config/db');
 const { requireMember } = require('../middleware/auth');
 const { toPlotDetail, toPlan, toSubscription } = require('../lib/serializers');
+const { growingNowForPlot } = require('../lib/growingNow');
 
 const router = express.Router();
-
-const GROWING_NOW = [
-  { name: 'Tomato', stage: 'Fruiting' },
-  { name: 'Spinach', stage: 'Ready' },
-  { name: 'Brinjal', stage: 'Flowering' },
-  { name: 'Carrot', stage: 'Growing' },
-];
 
 router.get('/', requireMember, async (req, res, next) => {
   try {
@@ -67,7 +61,7 @@ router.get('/', requireMember, async (req, res, next) => {
       subscription,
       farmer,
       facts,
-      growingNow: GROWING_NOW,
+      growingNow: await growingNowForPlot(sub.plotKey),
       heroImageUrl:
         plot?.imageUrl ||
         'https://chediwebsite.s3.us-east-1.amazonaws.com/images/land-morning.jpg',

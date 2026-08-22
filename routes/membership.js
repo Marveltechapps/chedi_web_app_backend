@@ -8,6 +8,7 @@ const { requireMember } = require('../middleware/auth');
 const { withIdempotency } = require('../lib/idempotency');
 const { validatePaymentMethod, createMembershipPaymentRequest } = require('../lib/payments');
 const { toMemberSummary } = require('../lib/members');
+const realtime = require('../lib/realtime');
 
 const router = express.Router();
 
@@ -74,6 +75,27 @@ router.post('/register', async (req, res, next) => {
     };
     await db.collection('registrations').insertOne(registration);
 
+    await realtime.emitSafe(
+      realtime.notifyMemberChange(realtime.EVENTS.CUSTOMER_CREATED, null, {
+        member: {
+          id: registration.id,
+          name: registration.name,
+          email: registration.email,
+          phone: registration.phoneDisplay,
+          accountStatus: 'pending',
+          subStatus: 'none',
+          city: registration.address.city,
+          addressDisplay: `${registration.address.line}, ${registration.address.city} ${registration.address.pin}`,
+        },
+        registration: {
+          id: registration.id,
+          name: registration.name,
+          email: registration.email,
+          status: registration.status,
+        },
+      })
+    );
+
     res.status(201).json({
       registrationId: registration.id,
       membershipFeeInr: fee,
@@ -111,6 +133,15 @@ router.post('/payments', async (req, res, next) => {
       const body = await createMembershipPaymentRequest(registration);
       return { status: 200, body };
     });
+
+    if (result.body?.payment) {
+      await realtime.emitSafe(
+        realtime.notifyPaymentChange(realtime.EVENTS.PAYMENT_CREATED, {
+          payment: result.body.payment,
+          memberId: result.body.payment.memberId || null,
+        })
+      );
+    }
 
     res.status(result.status).json(result.body);
   } catch (err) {

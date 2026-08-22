@@ -17,9 +17,18 @@ npm run dev
 npm run dev:memory
 ```
 
-API base: `http://localhost:4000/api/v1` (also mounted at `/api` for frontend `VITE_API_URL`).
+## Admin console API
 
-Health: `GET /health`
+Staff JWT under `/api/v1/admin/*` (see `chedi_admin_dashboard/API_CONTRACT.md`).
+
+```bash
+POST /api/v1/admin/login
+{ "email": "anitha@chedi.in", "password": "ChediAdmin123!" }
+```
+
+Use `Authorization: Bearer <accessToken>` on all other `/admin` routes except `POST /admin/refresh`. Seeded roles: Super Admin (`anitha`), Farm Manager (`murugan`), Billing Manager (`sundar`), Delivery Manager (`kavya`), Support Agent (`ramesh`).
+
+Legacy payment tools still work: `POST /admin/payments/:id/approve` with `Authorization: Bearer chedi-admin-demo` (used by `npm run e2e:api`).
 
 ## Login OTP (email)
 
@@ -29,8 +38,9 @@ OTPs are generated per request and emailed via Gmail SMTP (`GMAIL_USER` + `GMAIL
 |-------|--------|
 | Email | Registered member email (seeded e.g. `arun.kumar@example.com`) |
 | OTP | Sent to that inbox — check email |
-| Admin dashboard | http://localhost:4000/admin |
-| Admin key | `chedi-admin-demo` |
+| Admin dashboard | http://localhost:4000/admin (legacy payment tools) |
+| Staff console login | `anitha@chedi.in` / `ChediAdmin123!` (after `npm run seed`) |
+| Admin key (legacy) | `chedi-admin-demo` |
 
 For local tests without SMTP, set `ALLOW_DEMO_OTP=true` and `DEMO_OTP=1234` (or use `npm run dev:memory`).
 
@@ -62,6 +72,7 @@ See `.env.example`. Important flags:
 - `GOOGLE_SHEETS_WEBHOOK_URL` — optional audit log of OTP send events (never includes the code)
 - `MEMBERSHIP_FEE_INR=500`
 - `DELIVERY_CHARGE_INR=10000`
+- `STAFF_SEED_PASSWORD=ChediAdmin123!` — password for seeded console users (`anitha@chedi.in`, …)
 
 ## Payments
 

@@ -1,0 +1,50 @@
+{
+  "id": "app",
+  "membershipFeeInr": 500,
+  "membershipFeeFormatted": "₹500",
+  "deliveryChargeInr": 10000,
+  "deliveryChargeFormatted": "₹10,000",
+  "deliveryChargeNote": "Flat annual delivery charge across Tamil Nadu",
+  "includesWelcomeBasket": true,
+  "welcomeBasketNote": "Complimentary welcome basket · 5 kg fresh vegetables",
+  "welcomeBasketDescription": "Seasonal vegetable sample box",
+  "welcomeBasketImageUrl": "https://chediwebsite.s3.us-east-1.amazonaws.com/images/2148224020.jpg",
+  "welcomeBasketEtaDays": 2,
+  "billingMode": "manual",
+  "billingNote": "Manual billing. Pay this bill to activate weekly deliveries. No auto-charge.",
+  "paymentRequestNotice": "Our team will contact you by email to collect payment, then mark this request as paid from the Admin Dashboard.",
+  "defaultAddressLabel": "Home",
+  "lockedDeliveryNote": "Produce is already being harvested",
+  "plannedDeliveryNote": "Planned",
+  "leaseTeaser": [
+    { "step": 1, "title": "Pick a plot" },
+    { "step": 2, "title": "Choose a plan" },
+    { "step": 3, "title": "We farm it" }
+  ],
+  "reportRanges": ["This week", "This month", "This year"],
+  "notificationAudiences": [
+    "All members",
+    "Active subscribers",
+    "Pending payments",
+    "Renewal due",
+    "Individual member"
+  ],
+  "notificationChannels": ["Push", "SMS", "Email"],
+  "paymentLabels": {
+    "membership": "Farm Club membership (one-time)",
+    "lease": "Annual subscription · {plotName} · {planName}",
+    "renewal": "Renewal · {plotName}",
+    "default": "Payment"
+  },
+  "welcomeTrackingTemplate": [
+    { "title": "Order confirmed", "offsetMs": 0, "done": true, "timeLabel": "{date} · membership activated" },
+    { "title": "Packed at farm", "offsetMs": 86400000, "done": true, "timeLabel": "{date}, 9:00 AM" },
+    { "title": "Out for delivery", "offsetMs": 0, "useEta": true, "done": false, "active": true, "timeLabel": "Expected {date}, morning" },
+    { "title": "Delivered to your door", "offsetMs": 0, "useEta": true, "done": false, "timeLabel": "Expected {date}, by 1 PM" }
+  ],
+  "deliveryTrackingTemplate": [
+    { "title": "Packed", "offsetMs": -3600000, "done": true, "timeLabel": "{date}" },
+    { "title": "Out for delivery", "offsetMs": 0, "done": false, "active": true, "timeLabel": "Expected {date}" },
+    { "title": "Delivered to your door", "offsetMs": 10800000, "done": false, "timeLabel": "Expected {date}" }
+  ]
+}

@@ -3,6 +3,7 @@ const { nanoid } = require('nanoid');
 const { getDB } = require('../config/db');
 const { ApiError } = require('../lib/errors');
 const { requireMember } = require('../middleware/auth');
+const realtime = require('../lib/realtime');
 
 const router = express.Router();
 
@@ -65,6 +66,11 @@ router.post('/', requireMember, async (req, res, next) => {
       createdAt: new Date(),
     };
     await db.collection('addresses').insertOne(address);
+    await realtime.emitSafe(
+      realtime.notifyAddressChange(realtime.EVENTS.ADDRESS_CREATED, req.member.id, {
+        address: toAddress(address),
+      })
+    );
     res.status(201).json({ ok: true, address: toAddress(address) });
   } catch (err) {
     next(err);
@@ -86,6 +92,11 @@ router.patch('/:id', requireMember, async (req, res, next) => {
     }
     await db.collection('addresses').updateOne({ id: existing.id }, { $set });
     const address = await db.collection('addresses').findOne({ id: existing.id });
+    await realtime.emitSafe(
+      realtime.notifyAddressChange(realtime.EVENTS.ADDRESS_UPDATED, req.member.id, {
+        address: toAddress(address),
+      })
+    );
     res.json({ ok: true, address: toAddress(address) });
   } catch (err) {
     next(err);
@@ -114,7 +125,14 @@ router.post('/:id/default', requireMember, async (req, res, next) => {
       .find({ memberId: req.member.id })
       .sort({ isDefault: -1, createdAt: 1 })
       .toArray();
-    res.json({ ok: true, items: items.map(toAddress) });
+    const mapped = items.map(toAddress);
+    await realtime.emitSafe(
+      realtime.notifyAddressChange(realtime.EVENTS.ADDRESS_UPDATED, req.member.id, {
+        address: mapped.find((a) => a.isDefault) || mapped[0] || null,
+        addresses: mapped,
+      })
+    );
+    res.json({ ok: true, items: mapped });
   } catch (err) {
     next(err);
   }
@@ -139,6 +157,12 @@ router.delete('/:id', requireMember, async (req, res, next) => {
         );
       }
     }
+    await realtime.emitSafe(
+      realtime.notifyAddressChange(realtime.EVENTS.ADDRESS_DELETED, req.member.id, {
+        address: toAddress(existing),
+        addressId: existing.id,
+      })
+    );
     res.json({ ok: true });
   } catch (err) {
     next(err);

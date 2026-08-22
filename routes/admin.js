@@ -7,6 +7,7 @@ const {
   rejectPayment,
 } = require('../lib/payments');
 const { ApiError } = require('../lib/errors');
+const realtime = require('../lib/realtime');
 
 const router = express.Router();
 
@@ -42,6 +43,12 @@ router.post('/payments/:paymentId/approve', requireAdmin, async (req, res, next)
       approvedBy: req.body?.approvedBy || 'admin',
       adminNote: req.body?.adminNote || '',
     });
+    await realtime.emitSafe(
+      realtime.notifyPaymentChange(realtime.EVENTS.PAYMENT_UPDATED, {
+        payment: result.payment || result,
+        memberId: result.payment?.memberId || result.memberId,
+      })
+    );
     res.json({
       ok: true,
       ...result,
@@ -58,6 +65,12 @@ router.post('/payments/:paymentId/reject', requireAdmin, async (req, res, next) 
       rejectedBy: req.body?.rejectedBy || 'admin',
       adminNote: req.body?.adminNote || '',
     });
+    await realtime.emitSafe(
+      realtime.notifyPaymentChange(realtime.EVENTS.PAYMENT_UPDATED, {
+        payment: result.payment || result,
+        memberId: result.payment?.memberId || result.memberId,
+      })
+    );
     res.json({ ok: true, ...result });
   } catch (err) {
     next(err);

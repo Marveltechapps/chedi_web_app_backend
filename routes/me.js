@@ -12,6 +12,7 @@ const {
 const { normalizePhone, isValidIndianMobile, displayPhone } = require('../lib/phone');
 const otpService = require('../services/otp.service');
 const jwtService = require('../services/jwt.service');
+const realtime = require('../lib/realtime');
 
 const router = express.Router();
 
@@ -69,6 +70,11 @@ router.patch('/profile', requireMember, async (req, res, next) => {
     if (email !== undefined) $set.email = email;
     await db.collection('members').updateOne({ id: req.member.id }, { $set });
     const updated = await db.collection('members').findOne({ id: req.member.id });
+    await realtime.emitSafe(
+      realtime.notifyMemberChange(realtime.EVENTS.CUSTOMER_PROFILE_UPDATED, req.member.id, {
+        profile: toProfile(updated),
+      })
+    );
     res.json({ ok: true, profile: toProfile(updated) });
   } catch (err) {
     next(err);
@@ -147,6 +153,11 @@ router.post('/phone/verify', requireMember, async (req, res, next) => {
       }
     );
     const updated = await db.collection('members').findOne({ id: req.member.id });
+    await realtime.emitSafe(
+      realtime.notifyMemberChange(realtime.EVENTS.CUSTOMER_PROFILE_UPDATED, req.member.id, {
+        profile: toProfile(updated),
+      })
+    );
     res.json({ ok: true, profile: toProfile(updated) });
   } catch (err) {
     next(err);
@@ -168,6 +179,9 @@ router.put('/preferences/notifications', requireMember, async (req, res, next) =
     await db.collection('members').updateOne(
       { id: req.member.id },
       { $set: { preferences, updatedAt: new Date() } }
+    );
+    await realtime.emitSafe(
+      realtime.notifyMemberChange(realtime.EVENTS.CUSTOMER_UPDATED, req.member.id, { preferences })
     );
     res.json({ ok: true, preferences });
   } catch (err) {
@@ -193,6 +207,11 @@ router.put('/active-subscription', requireMember, async (req, res, next) => {
       { id: req.member.id },
       { $set: { activeSubscriptionId: subscriptionId, updatedAt: new Date() } }
     );
+    await realtime.emitSafe(
+      realtime.notifyMemberChange(realtime.EVENTS.CUSTOMER_UPDATED, req.member.id, {
+        activeSubscriptionId: subscriptionId,
+      })
+    );
     res.json({ ok: true, activeSubscriptionId: subscriptionId });
   } catch (err) {
     next(err);
@@ -206,12 +225,18 @@ router.delete('/', requireMember, async (req, res, next) => {
         { field: 'confirmation', message: 'Must be DELETE' },
       ]);
     }
-    await jwtService.revokeAllSessions(req.member.id);
-    await softDeleteMember(req.member.id);
+    const memberId = req.member.id;
+    await jwtService.revokeAllSessions(memberId);
+    await softDeleteMember(memberId);
     const db = getDB();
     await db.collection('deliveries').updateMany(
-      { memberId: req.member.id, cancelled: false, date: { $gte: new Date().toISOString().slice(0, 10) } },
+      { memberId, cancelled: false, date: { $gte: new Date().toISOString().slice(0, 10) } },
       { $set: { cancelled: true, cancellable: false, locked: true } }
+    );
+    await realtime.emitSafe(
+      realtime.notifyMemberChange(realtime.EVENTS.CUSTOMER_DELETED, memberId, {
+        member: { id: memberId, deleted: true },
+      })
     );
     res.json({ ok: true, message: 'Your account has been deleted.' });
   } catch (err) {

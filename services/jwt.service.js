@@ -108,6 +108,92 @@ async function revokeAllSessions(memberId) {
   return result.modifiedCount;
 }
 
+function createStaffAccessToken(staff) {
+  const expiresIn = ACCESS_EXPIRES();
+  const accessToken = jwt.sign(
+    {
+      sub: staff.id,
+      role: staff.role,
+      typ: 'staff_access',
+    },
+    ACCESS_SECRET(),
+    { expiresIn }
+  );
+  return { accessToken, expiresIn };
+}
+
+async function createStaffRefreshToken(staffId) {
+  const token = `rt_${nanoid(32)}`;
+  const expiresIn = REFRESH_EXPIRES();
+  const expiresAt = new Date(Date.now() + expiresIn * 1000);
+  const db = getDB();
+  await db.collection('staff_sessions').insertOne({
+    token,
+    staffId,
+    typ: 'staff',
+    createdAt: new Date(),
+    expiresAt,
+    revoked: false,
+  });
+  return { refreshToken: token, expiresIn };
+}
+
+async function issueStaffTokens(staff) {
+  const { accessToken, expiresIn } = createStaffAccessToken(staff);
+  const { refreshToken } = await createStaffRefreshToken(staff.id);
+  return {
+    accessToken,
+    refreshToken,
+    expiresIn,
+    tokenType: 'Bearer',
+  };
+}
+
+async function refreshStaffTokens(refreshToken) {
+  const db = getDB();
+  const session = await db.collection('staff_sessions').findOne({
+    token: refreshToken,
+    revoked: false,
+  });
+  if (!session) {
+    const err = new Error('Invalid refresh token');
+    err.code = 'UNAUTHORIZED';
+    err.status = 401;
+    throw err;
+  }
+  if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+    const err = new Error('Refresh token expired');
+    err.code = 'UNAUTHORIZED';
+    err.status = 401;
+    throw err;
+  }
+
+  await db.collection('staff_sessions').updateOne(
+    { _id: session._id },
+    { $set: { revoked: true, revokedAt: new Date() } }
+  );
+
+  const staff = await db.collection('staff').findOne({ id: session.staffId, active: { $ne: false } });
+  if (!staff) {
+    const err = new Error('Invalid admin credentials');
+    err.code = 'UNAUTHORIZED';
+    err.status = 401;
+    throw err;
+  }
+
+  const tokens = await issueStaffTokens(staff);
+  return { ...tokens, staff };
+}
+
+async function revokeStaffRefreshToken(refreshToken) {
+  if (!refreshToken) return;
+  const db = getDB();
+  await db.collection('staff_sessions').updateOne(
+    { token: refreshToken, revoked: false },
+    { $set: { revoked: true, revokedAt: new Date() } }
+  );
+}
+
 module.exports = {
   createAccessToken,
   createRefreshToken,
@@ -116,4 +202,9 @@ module.exports = {
   refreshTokens,
   revokeRefreshToken,
   revokeAllSessions,
+  createStaffAccessToken,
+  createStaffRefreshToken,
+  issueStaffTokens,
+  refreshStaffTokens,
+  revokeStaffRefreshToken,
 };

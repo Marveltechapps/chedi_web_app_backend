@@ -33,7 +33,7 @@ describe('POST /api/auth/otp', () => {
 
   it('returns 200 when OTP is sent', async () => {
     otpService.sendOtp.mockResolvedValue({
-      resendAvailableInSeconds: 30,
+      resendAvailableInSeconds: 60,
       otpExpiresInSeconds: 300,
     });
     const res = await request(app).post('/api/auth/otp').send({ email: 'member@example.com' });

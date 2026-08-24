@@ -14,7 +14,7 @@ function ttlSeconds() {
 }
 
 function resendCooldown() {
-  return Number(process.env.OTP_RESEND_COOLDOWN_SECONDS || 30);
+  return Number(process.env.OTP_RESEND_COOLDOWN_SECONDS || 60);
 }
 
 function maxAttempts() {

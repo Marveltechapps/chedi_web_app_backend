@@ -40,39 +40,39 @@ async function currentBasketItems() {
 function buildTracking(deliveryDate) {
   const d = new Date(deliveryDate + 'T00:00:00Z');
   const prev = new Date(d.getTime() - 24 * 60 * 60 * 1000);
-  const fmt = (date, time) =>
-    `${date.toLocaleDateString('en-GB', {
+  const fmt = (date) =>
+    date.toLocaleDateString('en-GB', {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
       timeZone: 'UTC',
-    })}${time ? `, ${time}` : ''}`;
+    });
 
   return [
     {
       title: 'Chennai city warehouse',
-      timeLabel: fmt(prev, '8:40 PM'),
+      timeLabel: fmt(prev),
       timestamp: new Date(prev.getTime() + 20 * 60 * 60 * 1000 + 40 * 60 * 1000).toISOString(),
       done: true,
       active: false,
     },
     {
       title: 'Packed at warehouse',
-      timeLabel: fmt(d, '5:30 AM'),
+      timeLabel: fmt(d),
       timestamp: new Date(d.getTime() + 5.5 * 60 * 60 * 1000).toISOString(),
       done: true,
       active: false,
     },
     {
       title: 'Out for delivery',
-      timeLabel: `Expected ${fmt(d, '7:00 AM')}`,
+      timeLabel: `Expected ${fmt(d)}`,
       timestamp: new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString(),
       done: false,
       active: true,
     },
     {
       title: 'Delivered to your door',
-      timeLabel: `Expected ${fmt(d)}, by 10 AM`,
+      timeLabel: `Expected ${fmt(d)}`,
       timestamp: new Date(d.getTime() + 10 * 60 * 60 * 1000).toISOString(),
       done: false,
       active: false,

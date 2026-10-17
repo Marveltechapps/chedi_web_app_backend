@@ -113,7 +113,7 @@ async function seedFive() {
         etaLabel: 'Soon',
         etaDate: memberSince,
         imageUrl: 'https://chediwebsite.s3.us-east-1.amazonaws.com/images/2148224020.jpg',
-        description: 'Seasonal vegetable sample box',
+        description: 'Token of Love',
       },
       membershipFeePaidInr: 500,
       createdAt: now,

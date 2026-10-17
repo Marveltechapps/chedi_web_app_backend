@@ -149,6 +149,51 @@ router.post('/payments', async (req, res, next) => {
   }
 });
 
+router.post('/welcome-basket/received', requireMember, async (req, res, next) => {
+  try {
+    const member = req.memberDoc;
+    const basket = member.welcomeBasket;
+    if (!basket) {
+      throw new ApiError(409, 'INVALID_STATUS', 'No welcome basket is on the way');
+    }
+    const already = basket.status === 'received' || basket.status === 'delivered';
+    if (already) {
+      return res.json({ success: true, welcomeBasket: basket });
+    }
+    const now = new Date();
+    const receivedLabel = now.toLocaleDateString('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+    const welcomeBasket = {
+      ...basket,
+      status: 'received',
+      receivedAt: now.toISOString(),
+      etaLabel: receivedLabel,
+      tracking: Array.isArray(basket.tracking)
+        ? basket.tracking.map((step, index, steps) => ({
+            ...step,
+            done: true,
+            active: false,
+            timeLabel: index === steps.length - 1 ? `${receivedLabel} · received` : step.timeLabel,
+          }))
+        : basket.tracking,
+    };
+    const db = getDB();
+    await db.collection('members').updateOne(
+      { id: member.id },
+      { $set: { welcomeBasket, updatedAt: now } }
+    );
+    await realtime.emitSafe(
+      realtime.notifyMemberChange(realtime.EVENTS.CUSTOMER_UPDATED, member.id)
+    );
+    res.json({ success: true, message: 'Welcome gift marked received', welcomeBasket });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/me', requireMember, async (req, res, next) => {
   try {
     const member = req.memberDoc;

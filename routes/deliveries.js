@@ -5,6 +5,7 @@ const { requireMember } = require('../middleware/auth');
 const { nextSeq } = require('../lib/admin/ids');
 const { publishedBasket } = require('../lib/admin/baskets.service');
 const realtime = require('../lib/realtime');
+const { syncDeliveryWindow, cancelStillOpen, kolkataToday } = require('../lib/deliveryWindow');
 
 const router = express.Router();
 
@@ -108,11 +109,7 @@ router.get('/', requireMember, async (req, res, next) => {
     });
     if (!sub) throw new ApiError(404, 'SUBSCRIPTION_NOT_FOUND', 'Subscription not found');
 
-    const schedule = await db
-      .collection('deliveries')
-      .find({ subscriptionId })
-      .sort({ weekIndex: 1 })
-      .toArray();
+    const schedule = await syncDeliveryWindow(member.id, subscriptionId);
 
     const current = schedule.find((d) => !d.cancelled) || schedule[0];
     const basket = await currentBasketItems();
@@ -152,6 +149,8 @@ router.post('/:deliveryId/cancel', requireMember, async (req, res, next) => {
   try {
     const db = getDB();
     const subscriptionId = req.body?.subscriptionId || req.memberDoc.activeSubscriptionId;
+    if (subscriptionId) await syncDeliveryWindow(req.member.id, subscriptionId);
+    const today = kolkataToday();
     const delivery = await db.collection('deliveries').findOne({
       id: req.params.deliveryId,
       memberId: req.member.id,
@@ -160,6 +159,13 @@ router.post('/:deliveryId/cancel', requireMember, async (req, res, next) => {
     if (!delivery) throw new ApiError(404, 'DELIVERY_NOT_FOUND', 'Delivery not found');
     if (delivery.cancelled) {
       throw new ApiError(409, 'ALREADY_CANCELLED', 'Delivery already cancelled');
+    }
+    if (!cancelStillOpen(delivery, today)) {
+      throw new ApiError(
+        400,
+        'DELIVERY_LOCKED',
+        'Cancel closes one week before delivery. This week is approved and locked.'
+      );
     }
 
     const seq = await nextSeq('cancellation', 1);
@@ -172,18 +178,12 @@ router.post('/:deliveryId/cancel', requireMember, async (req, res, next) => {
       date: delivery.date,
       dateLabel: delivery.dateLabel,
       reason: req.body?.reason || '',
-      locked: Boolean(delivery.locked || !delivery.cancellable),
-      status: 'pending',
+      locked: false,
+      status: 'approved',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    if (delivery.locked || !delivery.cancellable) {
-      await db.collection('cancellation_requests').insertOne(request);
-      throw new ApiError(400, 'DELIVERY_LOCKED', 'This delivery cannot be cancelled');
-    }
-
-    request.status = 'approved';
     await db.collection('cancellation_requests').insertOne(request);
 
     await db.collection('deliveries').updateOne(

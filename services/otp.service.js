@@ -162,24 +162,15 @@ async function clearOtp(purpose, target) {
 async function deliverOtp({ deliveryChannel, dest, mailTo, code, purpose }) {
   console.log('[OTP] SMS request started');
   try {
-    if (deliveryChannel === 'sms' && smsConfigured()) {
+    if (mailTo && gmailConfigured()) {
+      await sendOtpEmail({ to: mailTo, code, purpose });
+    } else if (deliveryChannel === 'sms' && smsConfigured()) {
       await sendOtpSms({ to: dest, code, purpose });
-    } else if (mailTo) {
-      if (gmailConfigured()) {
-        await sendOtpEmail({ to: mailTo, code, purpose });
-      } else if (allowDemoOtp()) {
-        console.log(`[email/demo] ${purpose} OTP queued for ${mailTo}`);
-      } else {
-        const err = new Error('Unable to send OTP. Please try again.');
-        err.code = 'EMAIL_NOT_CONFIGURED';
-        err.status = 503;
-        throw err;
-      }
     } else if (allowDemoOtp()) {
-      console.log(`[otp/demo] ${purpose} OTP generated for configured demo mode`);
+      console.log(`[otp/demo] ${purpose} code ready for ${mailTo || dest} (${String(code).length} digits)`);
     } else {
       const err = new Error('Unable to send OTP. Please try again.');
-      err.code = 'OTP_DELIVERY_FAILED';
+      err.code = mailTo ? 'EMAIL_NOT_CONFIGURED' : 'OTP_DELIVERY_FAILED';
       err.status = 503;
       throw err;
     }

@@ -244,43 +244,91 @@ router.delete('/', requireMember, async (req, res, next) => {
   }
 });
 
+const EXPORT_HIDDEN = new Set(['_id', 'passwordHash', 'tokenRef', 'otp', 'otpHash', 'otpCode']);
+
+function exportRow(doc) {
+  if (!doc || typeof doc !== 'object') return doc;
+  const out = {};
+  for (const [key, value] of Object.entries(doc)) {
+    if (EXPORT_HIDDEN.has(key)) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+async function buildMemberExport(member) {
+  const db = getDB();
+  const memberId = member.id;
+  const [addresses, subscriptions, payments, paymentMethods, deliveries, notifications, tickets] =
+    await Promise.all([
+      db.collection('addresses').find({ memberId }).toArray(),
+      db.collection('subscriptions').find({ memberId }).toArray(),
+      db.collection('payments').find({ memberId }).toArray(),
+      db.collection('payment_methods').find({ memberId }).toArray(),
+      db.collection('deliveries').find({ memberId }).toArray(),
+      db.collection('notifications').find({ memberId }).toArray(),
+      db.collection('tickets').find({ memberId }).toArray(),
+    ]);
+
+  return {
+    exportedAt: new Date().toISOString(),
+    profile: {
+      ...toMemberSummary(member),
+      ...toProfile(member),
+      preferences: member.preferences || null,
+      accountStatus: member.accountStatus || null,
+      memberSince: member.memberSince || null,
+    },
+    addresses: addresses.map(exportRow),
+    subscriptions: subscriptions.map(exportRow),
+    payments: payments.map(exportRow),
+    paymentMethods: paymentMethods.map(exportRow),
+    deliveries: deliveries.map(exportRow),
+    notifications: notifications.map(exportRow),
+    supportTickets: tickets.map(exportRow),
+  };
+}
+
 router.post('/data-export', requireMember, async (req, res, next) => {
   try {
     const db = getDB();
     const exportId = `exp_${nanoid(8)}`;
-    const doc = {
+    const downloadUrl = `/api/v1/me/data-export/${exportId}/download`;
+    await db.collection('data_exports').insertOne({
       id: exportId,
       memberId: req.member.id,
-      status: 'pending',
-      downloadUrl: null,
+      status: 'ready',
+      downloadUrl,
       createdAt: new Date(),
-    };
-    await db.collection('data_exports').insertOne(doc);
-
-    // Demo: mark ready immediately with inline payload URL placeholder
-    setImmediate(async () => {
-      try {
-        await db.collection('data_exports').updateOne(
-          { id: exportId },
-          {
-            $set: {
-              status: 'ready',
-              downloadUrl: `/api/v1/me/data-export/${exportId}/download`,
-              readyAt: new Date(),
-            },
-          }
-        );
-      } catch {
-        /* ignore */
-      }
+      readyAt: new Date(),
     });
 
-    res.status(202).json({
+    res.json({
       ok: true,
       exportId,
-      status: 'pending',
-      downloadUrl: null,
+      status: 'ready',
+      downloadUrl,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/data-export/:exportId/download', requireMember, async (req, res, next) => {
+  try {
+    const db = getDB();
+    const doc = await db.collection('data_exports').findOne({
+      id: req.params.exportId,
+      memberId: req.member.id,
+    });
+    if (!doc) throw new ApiError(404, 'NOT_FOUND', 'Export not found');
+
+    const member = req.memberDoc;
+    const payload = await buildMemberExport(member);
+    const code = String(member.memberCode || member.id || 'member').replace(/[^\w.-]+/g, '');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="chedi-data-${code}.json"`);
+    res.json(payload);
   } catch (err) {
     next(err);
   }

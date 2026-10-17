@@ -10,8 +10,16 @@ const SMTP_TIMEOUT_MS = Number(process.env.OTP_SMTP_TIMEOUT_MS || 18000);
 
 let transporter = null;
 
+function gmailUser() {
+  return String(process.env.GMAIL_USER || '').trim();
+}
+
+function gmailPassword() {
+  return String(process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '');
+}
+
 function gmailConfigured() {
-  return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+  return Boolean(gmailUser() && gmailPassword());
 }
 
 function attachTransporterGuards(tx) {
@@ -29,10 +37,12 @@ function getTransporter() {
   }
   if (!transporter) {
     transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
+        user: gmailUser(),
+        pass: gmailPassword(),
       },
       connectionTimeout: SMTP_TIMEOUT_MS,
       greetingTimeout: SMTP_TIMEOUT_MS,
@@ -128,7 +138,7 @@ async function notifySupport({ to, purpose }) {
     const tx = getTransporter();
     await withTimeout(
       tx.sendMail({
-        from: `"CHEDI" <${process.env.GMAIL_USER}>`,
+        from: `"CHEDI" <${gmailUser()}>`,
         to: support,
         subject: `[CHEDI] OTP requested (${purpose})`,
         text: `An OTP was requested for ${to} (purpose: ${purpose}) at ${new Date().toISOString()}.`,
@@ -157,7 +167,7 @@ async function sendOtpEmail({ to, code, purpose = 'login' }) {
     const tx = getTransporter();
     const info = await withTimeout(
       tx.sendMail({
-        from: `"CHEDI" <${process.env.GMAIL_USER}>`,
+        from: `"CHEDI" <${gmailUser()}>`,
         to,
         subject,
         text,

@@ -1,4 +1,6 @@
 node_modules/
+.mongo-data/
+uploads/
 coverage/
 .env
 *.log

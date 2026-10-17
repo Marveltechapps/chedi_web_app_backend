@@ -10,6 +10,7 @@ const {
   toPaymentIntent,
   createRenewalPaymentRequest,
   createSubscriptionFromPayment,
+  assertPlanPlotLimit,
   DELIVERY_CHARGE_INR,
 } = require('../lib/payments');
 const realtime = require('../lib/realtime');
@@ -64,6 +65,7 @@ router.post('/quote', requireMember, async (req, res, next) => {
     const planDoc = await db.collection('plans').findOne({ key: planKey });
     if (!planDoc) throw new ApiError(404, 'PLAN_NOT_FOUND', 'Plan not found');
     const plan = toPlan(planDoc);
+    await assertPlanPlotLimit({ memberId: req.member.id, plotKey, plan });
     const deliveryChargeInr = DELIVERY_CHARGE_INR();
 
     res.json({

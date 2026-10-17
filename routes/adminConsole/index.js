@@ -15,6 +15,7 @@ const cancellations = require('../../lib/admin/cancellations.service');
 const notifications = require('../../lib/admin/notifications.service');
 const tickets = require('../../lib/admin/tickets.service');
 const reports = require('../../lib/admin/reports.service');
+const staffAccounts = require('../../lib/admin/staff.service');
 const { listAdminPayments } = require('../../lib/payments');
 const realtime = require('../../lib/realtime');
 
@@ -246,26 +247,6 @@ router.post(
   })
 );
 
-router.post(
-  '/payments/:paymentId/refund',
-  requireModule('payments', { write: true }),
-  asyncHandler(async (req, res) => {
-    const result = await withIdempotency(req, 'admin_refund', async () => {
-      const body = await payments.refundPayment(req.params.paymentId, req.body || {}, req.staff);
-      return { status: 200, body: { success: true, message: 'Refund issued', data: body } };
-    });
-    if (result.body?.success) {
-      await realtime.emitSafe(
-        realtime.notifyPaymentChange(realtime.EVENTS.PAYMENT_UPDATED, {
-          payment: result.body.data?.payment || result.body.data,
-          memberId: result.body.data?.payment?.memberId || result.body.data?.memberId,
-        })
-      );
-    }
-    res.status(result.status).json(result.body);
-  })
-);
-
 router.get(
   '/subscriptions',
   requireModule('subscriptions'),
@@ -376,12 +357,46 @@ router.get(
   })
 );
 
+router.post(
+  '/farms',
+  requireModule('plots', { write: true }),
+  asyncHandler(async (req, res) => {
+    ok(res, await plots.createFarm(req.body || {}, req.staff), { status: 201, message: 'Farm created' });
+  })
+);
+
+router.patch(
+  '/farms/:farmId',
+  requireModule('plots', { write: true }),
+  asyncHandler(async (req, res) => {
+    ok(res, await plots.updateFarm(req.params.farmId, req.body || {}, req.staff), { message: 'Farm updated' });
+  })
+);
+
+router.delete(
+  '/farms/:farmId',
+  requireModule('plots', { write: true }),
+  asyncHandler(async (req, res) => {
+    ok(res, await plots.deleteFarm(req.params.farmId, req.staff), { message: 'Farm deleted' });
+  })
+);
+
 router.get(
   '/plots',
   requireModule('plots'),
   asyncHandler(async (req, res) => {
     const result = await plots.listPlots(req.query);
     ok(res, result.data, { pagination: result.pagination, meta: result.meta });
+  })
+);
+
+router.post(
+  '/plots',
+  requireModule('plots', { write: true }),
+  asyncHandler(async (req, res) => {
+    const data = await plots.createPlot(req.body || {}, req.staff);
+    await realtime.emitSafe(realtime.notifyPlotChange({ plot: data, memberId: data.memberId }));
+    ok(res, data, { status: 201, message: 'Plot created' });
   })
 );
 
@@ -425,6 +440,45 @@ router.patch(
   })
 );
 
+router.delete(
+  '/plots/:plotKey',
+  requireModule('plots', { write: true }),
+  asyncHandler(async (req, res) => {
+    const data = await plots.deletePlot(req.params.plotKey, req.staff);
+    await realtime.emitSafe(realtime.notifyPlotChange({ plot: data }));
+    ok(res, data, { message: 'Plot deleted' });
+  })
+);
+
+router.post(
+  '/plots/:plotKey/images',
+  requireModule('plots', { write: true }),
+  asyncHandler(async (req, res) => {
+    const data = await plots.addPlotImage(req.params.plotKey, req.body || {}, req.staff);
+    await realtime.emitSafe(realtime.notifyPlotChange({ plot: data, memberId: data.memberId }));
+    ok(res, data, { status: 201, message: 'Image added' });
+  })
+);
+
+async function removePlotImageRoute(req, res) {
+  const imageUrl = req.body?.imageUrl || req.query?.imageUrl;
+  const data = await plots.removePlotImage(req.params.plotKey, imageUrl, req.staff);
+  await realtime.emitSafe(realtime.notifyPlotChange({ plot: data, memberId: data.memberId }));
+  ok(res, data, { message: 'Image removed' });
+}
+
+router.post(
+  '/plots/:plotKey/images/remove',
+  requireModule('plots', { write: true }),
+  asyncHandler(removePlotImageRoute)
+);
+
+router.delete(
+  '/plots/:plotKey/images',
+  requireModule('plots', { write: true }),
+  asyncHandler(removePlotImageRoute)
+);
+
 router.post(
   '/plots/:plotKey/notify-open',
   requireModule('plots', { write: true }),
@@ -450,6 +504,26 @@ router.post(
     const data = await crops.createCrop(req.body || {}, req.staff);
     await realtime.emitSafe(realtime.notifyCropChange({ crop: data }));
     ok(res, data, { status: 201 });
+  })
+);
+
+router.patch(
+  '/crops/:key',
+  requireModule('crops', { write: true }),
+  asyncHandler(async (req, res) => {
+    const data = await crops.updateCrop(req.params.key, req.body || {}, req.staff);
+    await realtime.emitSafe(realtime.notifyCropChange({ crop: data }));
+    ok(res, data);
+  })
+);
+
+router.delete(
+  '/crops/:key',
+  requireModule('crops', { write: true }),
+  asyncHandler(async (req, res) => {
+    const data = await crops.deleteCrop(req.params.key, req.staff);
+    await realtime.emitSafe(realtime.notifyCropChange({ crop: data }));
+    ok(res, data, { message: 'Crop deleted' });
   })
 );
 
@@ -495,6 +569,16 @@ router.patch(
       realtime.notifyCropChange({ crop: data, memberId: data.memberId, plot: data })
     );
     ok(res, data);
+  })
+);
+
+router.delete(
+  '/plots/:plotKey/crop',
+  requireModule('crops', { write: true }),
+  asyncHandler(async (req, res) => {
+    const data = await crops.removeCultivation(req.params.plotKey, req.staff);
+    await realtime.emitSafe(realtime.notifyCropChange({ crop: data, plot: data }));
+    ok(res, data, { message: 'Harvest removed' });
   })
 );
 
@@ -763,6 +847,38 @@ router.get(
   requireModule('dashboard'),
   asyncHandler(async (req, res) => {
     ok(res, await reports.listStaff());
+  })
+);
+
+router.post(
+  '/staff',
+  requireModule('audit', { write: true }),
+  asyncHandler(async (req, res) => {
+    const result = await withIdempotency(req, 'admin_create_staff', async () => {
+      const body = await staffAccounts.createStaff(req.body || {}, req.staff);
+      return { status: 201, body: { success: true, message: 'Staff created', data: body } };
+    });
+    res.status(result.status).json(result.body);
+  })
+);
+
+router.patch(
+  '/staff/:staffId',
+  requireModule('audit', { write: true }),
+  asyncHandler(async (req, res) => {
+    ok(res, await staffAccounts.updateStaff(req.params.staffId, req.body || {}, req.staff), {
+      message: 'Staff updated',
+    });
+  })
+);
+
+router.delete(
+  '/staff/:staffId',
+  requireModule('audit', { write: true }),
+  asyncHandler(async (req, res) => {
+    ok(res, await staffAccounts.removeStaff(req.params.staffId, req.staff), {
+      message: 'Staff removed',
+    });
   })
 );
 

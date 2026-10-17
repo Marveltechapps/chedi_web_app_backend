@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const { nanoid } = require('nanoid');
@@ -32,7 +33,8 @@ function createApp() {
   app.set('trust proxy', 1);
 
   app.use(cors(corsOptions()));
-  app.use(express.json({ limit: '1mb' }));
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+  app.use(express.json({ limit: '8mb' }));
   app.use(requestTimeout(REQUEST_TIMEOUT_MS));
 
   app.use((req, _res, next) => {

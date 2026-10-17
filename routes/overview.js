@@ -4,6 +4,7 @@ const { requireMember } = require('../middleware/auth');
 const { toMemberSummary } = require('../lib/members');
 const { toSubscription, toPlan } = require('../lib/serializers');
 const { growingNowForPlot } = require('../lib/growingNow');
+const { syncDeliveryWindow } = require('../lib/deliveryWindow');
 
 const router = express.Router();
 
@@ -37,10 +38,8 @@ router.get('/', requireMember, async (req, res, next) => {
         const planDoc = await db.collection('plans').findOne({ key: sub.planKey });
         activeSubscription = toSubscription(sub, plot, planDoc ? toPlan(planDoc) : null);
 
-        const delivery = await db.collection('deliveries').findOne(
-          { subscriptionId: sub.id, cancelled: false },
-          { sort: { weekIndex: 1 } }
-        );
+        const window = await syncDeliveryWindow(member.id, sub.id);
+        const delivery = window.find((d) => !d.cancelled) || null;
         if (delivery) {
           nextDelivery = {
             dateLabel: delivery.dateLabel,

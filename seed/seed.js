@@ -119,7 +119,7 @@ async function seed() {
       etaLabel: 'Tue, 22 Jul',
       etaDate: '2026-07-22',
       imageUrl: 'https://chediwebsite.s3.us-east-1.amazonaws.com/images/2148224020.jpg',
-      description: 'Seasonal vegetable sample box',
+      description: 'Token of Love',
       tracking: buildWelcomeTracking(activatedAt, welcomeEta).map((s, i) => ({
         ...s,
         done: true,

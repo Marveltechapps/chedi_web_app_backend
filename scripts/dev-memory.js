@@ -1,27 +1,46 @@
 /**
- * Boots an in-memory MongoDB, seeds demo data, and starts the API.
+ * Boots a local MongoDB whose files stay in .mongo-data, seeds demo data
+ * only when the database is empty, and starts the API.
  * Usage: npm run dev:memory
  */
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 async function main() {
   const { MongoMemoryServer } = require('mongodb-memory-server');
-  const mongod = await MongoMemoryServer.create();
+  const dbPath = path.join(__dirname, '..', '.mongo-data');
+  fs.mkdirSync(dbPath, { recursive: true });
+  const mongod = await MongoMemoryServer.create({
+    instance: {
+      dbPath,
+      storageEngine: 'wiredTiger',
+    },
+  });
   process.env.CHEDI_USE_MEMORY_MONGO = 'true';
   process.env.MONGODB_URI = mongod.getUri();
   process.env.MONGODB_DB = process.env.MONGODB_DB || 'chedi_csa';
-  process.env.ALLOW_DEMO_OTP = process.env.ALLOW_DEMO_OTP || 'true';
+  // Keep .env ALLOW_DEMO_OTP. When Gmail is set, login codes are emailed.
+  if (!process.env.ALLOW_DEMO_OTP && !process.env.GMAIL_USER) {
+    process.env.ALLOW_DEMO_OTP = 'true';
+  }
   process.env.DEMO_OTP = process.env.DEMO_OTP || '1234';
   process.env.OTP_LENGTH = process.env.OTP_LENGTH || '4';
   process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
-  console.log('[dev:memory] MongoMemoryServer ready');
+  console.log(`[dev:memory] MongoMemoryServer ready (${dbPath})`);
 
-  const { seed } = require('../seed/seed');
-  await seed();
+  const { connectDB, getDB } = require('../config/db');
+  await connectDB();
+  const memberCount = await getDB().collection('members').countDocuments();
+  if (memberCount === 0) {
+    const { seed } = require('../seed/seed');
+    await seed();
+  } else {
+    console.log(`[dev:memory] keeping existing local data (${memberCount} members)`);
+  }
 
   const http = require('http');
-  const { connectDB } = require('../config/db');
   const { initRedis } = require('../config/redis');
   const { createApp } = require('../app');
   const { attachRealtime } = require('../lib/realtime');
@@ -43,7 +62,7 @@ async function main() {
 
   const shutdown = async () => {
     try {
-      await mongod.stop();
+      await mongod.stop({ doCleanup: false });
     } catch {
       /* ignore */
     }

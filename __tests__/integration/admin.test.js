@@ -51,6 +51,50 @@ describe('admin console API', () => {
     expect(Array.isArray(res.body.data.pendingActions)).toBe(true);
   });
 
+  it('creates, updates, finds, and deletes a member by user id', async () => {
+    const token = await login();
+    const auth = { Authorization: `Bearer ${token}` };
+    const created = await request(app)
+      .post('/api/v1/admin/members')
+      .set(auth)
+      .set('Idempotency-Key', 'test-member-crud-1')
+      .send({
+        userId: '8801',
+        name: 'CRUD Member',
+        email: 'crud.member@chedi.in',
+        phone: '9876508801',
+        address: { line: '12 Farm Road', city: 'Chennai', pin: '600001' },
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.data.id).toBe('8801');
+    expect(created.body.data.memberCode).toBe('CHEDI-8801');
+
+    const updated = await request(app)
+      .patch('/api/v1/admin/members/CHEDI-8801')
+      .set(auth)
+      .send({
+        name: 'CRUD Member Updated',
+        address: { line: '18 Farm Road', city: 'Madurai', pin: '625001' },
+      });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.name).toBe('CRUD Member Updated');
+    expect(updated.body.data.city).toBe('Madurai');
+
+    const found = await request(app)
+      .get('/api/v1/admin/members')
+      .query({ q: '8801' })
+      .set(auth);
+    expect(found.status).toBe(200);
+    expect(found.body.data.some((m) => m.id === '8801')).toBe(true);
+
+    const removed = await request(app).delete('/api/v1/admin/members/8801').set(auth);
+    expect(removed.status).toBe(200);
+    expect(removed.body.data.deleted).toBe(true);
+
+    const missing = await request(app).get('/api/v1/admin/members/8801').set(auth);
+    expect(missing.status).toBe(404);
+  });
+
   it('lists members with filter counts', async () => {
     const token = await login();
     const res = await request(app)

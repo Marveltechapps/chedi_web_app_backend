@@ -21,6 +21,12 @@ async function ensureIndexes() {
   await db.collection('payments').createIndexes([
     { key: { id: 1 }, unique: true },
     { key: { memberId: 1, createdAt: -1 } },
+    {
+      key: { collectionRefNorm: 1 },
+      unique: true,
+      partialFilterExpression: { collectionRefNorm: { $type: 'string' } },
+      name: 'payments_collectionRefNorm_unique',
+    },
   ]);
   await db.collection('sessions').createIndexes([
     { key: { token: 1 }, unique: true },

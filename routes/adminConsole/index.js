@@ -67,6 +67,37 @@ router.get(
 );
 
 router.post(
+  '/members',
+  requireModule('members', { write: true }),
+  asyncHandler(async (req, res) => {
+    const result = await withIdempotency(req, 'admin_create_member', async () => {
+      const body = await members.createMember(req.body || {}, req.staff);
+      return { status: 201, body, message: 'Member created' };
+    });
+    if (!result.replay) {
+      await realtime.emitSafe(
+        realtime.notifyMemberChange(realtime.EVENTS.CUSTOMER_CREATED, result.body?.id, { member: result.body })
+      );
+    }
+    ok(res, result.body, { status: result.status, message: result.message });
+  })
+);
+
+router.delete(
+  '/members/:memberId',
+  requireModule('members', { write: true }),
+  asyncHandler(async (req, res) => {
+    const data = await members.deleteMember(req.params.memberId, req.staff);
+    await realtime.emitSafe(
+      realtime.notifyMemberChange(realtime.EVENTS.CUSTOMER_DELETED, data.id, {
+        member: { id: data.id, memberCode: data.memberCode, deleted: true },
+      })
+    );
+    ok(res, data, { message: 'Member deleted' });
+  })
+);
+
+router.post(
   '/members/:memberId/activate',
   requireModule('members', { write: true }),
   asyncHandler(async (req, res) => {

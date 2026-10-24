@@ -38,46 +38,67 @@ async function currentBasketItems() {
   return DEFAULT_BASKET;
 }
 
-function buildTracking(deliveryDate) {
-  const d = new Date(deliveryDate + 'T00:00:00Z');
+const STATUS_META = {
+  scheduled: { label: 'Scheduled', tone: 'neutral', rank: 0 },
+  rescheduled: { label: 'Rescheduled', tone: 'amber', rank: 0 },
+  packed: { label: 'Packed', tone: 'amber', rank: 1 },
+  ready_dispatch: { label: 'Ready to dispatch', tone: 'amber', rank: 2 },
+  out: { label: 'Out for delivery', tone: 'amber', rank: 3 },
+  delivered: { label: 'Delivered to your door', tone: 'green', rank: 4 },
+  failed: { label: 'Delivery failed', tone: 'red', rank: 3 },
+  cancelled: { label: 'Cancelled', tone: 'red', rank: -1 },
+};
+
+function statusMeta(opsStatus) {
+  return STATUS_META[opsStatus] || STATUS_META.scheduled;
+}
+
+function buildTracking(delivery) {
+  const date = delivery?.date || new Date().toISOString().slice(0, 10);
+  const d = new Date(date + 'T00:00:00Z');
   const prev = new Date(d.getTime() - 24 * 60 * 60 * 1000);
-  const fmt = (date) =>
-    date.toLocaleDateString('en-GB', {
+  const fmt = (dateValue) =>
+    dateValue.toLocaleDateString('en-GB', {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
       timeZone: 'UTC',
     });
+  const ops = delivery?.cancelled ? 'cancelled' : delivery?.opsStatus || 'scheduled';
+  const progress =
+    ops === 'delivered'
+      ? { active: 3, doneThrough: 3 }
+      : ops === 'failed' || ops === 'out' || ops === 'ready_dispatch'
+        ? { active: 2, doneThrough: 1 }
+        : ops === 'packed'
+          ? { active: 1, doneThrough: 0 }
+          : ops === 'cancelled'
+            ? { active: -1, doneThrough: -1 }
+            : { active: 0, doneThrough: -1 };
+  const when = (index) => {
+    if (ops === 'cancelled') return 'Cancelled';
+    if (ops === 'failed' && index >= 2) return 'Could not be delivered';
+    if (ops === 'out' && index === 2) return 'Out for delivery';
+    if (ops === 'delivered' && index === 3) return 'Delivered to your door';
+    if (ops === 'rescheduled' && index === 0) return `Moved to ${fmt(d)}`;
+    if (index <= progress.doneThrough) return fmt(index === 0 ? prev : d);
+    return `Expected ${fmt(d)}`;
+  };
+  const step = (index, title, timestamp) => ({
+    title,
+    timeLabel: when(index),
+    timestamp,
+    done: index <= progress.doneThrough,
+    active: index === progress.active,
+  });
+
+  const outTitle = ops === 'failed' ? 'Delivery failed' : ops === 'ready_dispatch' ? 'Ready to dispatch' : 'Out for delivery';
 
   return [
-    {
-      title: 'Chennai city warehouse',
-      timeLabel: fmt(prev),
-      timestamp: new Date(prev.getTime() + 20 * 60 * 60 * 1000 + 40 * 60 * 1000).toISOString(),
-      done: true,
-      active: false,
-    },
-    {
-      title: 'Packed at warehouse',
-      timeLabel: fmt(d),
-      timestamp: new Date(d.getTime() + 5.5 * 60 * 60 * 1000).toISOString(),
-      done: true,
-      active: false,
-    },
-    {
-      title: 'Out for delivery',
-      timeLabel: `Expected ${fmt(d)}`,
-      timestamp: new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString(),
-      done: false,
-      active: true,
-    },
-    {
-      title: 'Delivered to your door',
-      timeLabel: `Expected ${fmt(d)}`,
-      timestamp: new Date(d.getTime() + 10 * 60 * 60 * 1000).toISOString(),
-      done: false,
-      active: false,
-    },
+    step(0, 'Chennai city warehouse', new Date(prev.getTime() + 20 * 60 * 60 * 1000).toISOString()),
+    step(1, 'Packed at warehouse', new Date(d.getTime() + 5.5 * 60 * 60 * 1000).toISOString()),
+    step(2, outTitle, new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString()),
+    step(3, 'Delivered to your door', new Date(d.getTime() + 10 * 60 * 60 * 1000).toISOString()),
   ];
 }
 
@@ -111,19 +132,28 @@ router.get('/', requireMember, async (req, res, next) => {
 
     const schedule = await syncDeliveryWindow(member.id, subscriptionId);
 
-    const current = schedule.find((d) => !d.cancelled) || schedule[0];
+    const open = schedule.filter((d) => !d.cancelled);
+    const pool = open.length ? open : schedule;
+    const withStatus = (status) => pool.find((d) => (d.opsStatus || 'scheduled') === status);
+    const current = withStatus('out') || withStatus('delivered') || withStatus('rescheduled') || pool[0];
     const basket = await currentBasketItems();
+    const ops = current?.cancelled ? 'cancelled' : current?.opsStatus || 'scheduled';
+    const meta = current ? statusMeta(ops) : null;
 
     res.json({
       hasPlot: true,
       subscriptionId,
       currentWeek: current
         ? {
+            id: current.id,
             label: current.label,
             date: current.date,
             dateLabel: current.dateLabel,
+            status: ops,
+            statusLabel: meta.label,
+            statusTone: meta.tone,
             varietyCount: basket.length || 9,
-            tracking: buildTracking(current.date),
+            tracking: buildTracking(current),
             basket,
           }
         : null,
@@ -133,7 +163,8 @@ router.get('/', requireMember, async (req, res, next) => {
         label: d.label,
         date: d.date,
         dateLabel: d.dateLabel,
-        note: d.cancelled ? 'Cancelled' : d.note,
+        note: d.cancelled ? 'Cancelled' : statusMeta(d.opsStatus || 'scheduled').label,
+        status: d.cancelled ? 'cancelled' : d.opsStatus || 'scheduled',
         locked: d.locked || d.cancelled,
         cancellable: d.cancellable && !d.cancelled,
         cancelled: Boolean(d.cancelled),
